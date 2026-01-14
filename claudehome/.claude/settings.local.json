@@ -1,8 +1,5 @@
 {
   "permissions": {
-    "additionalDirectories": [
-      "/workspace/projects",
-      "C:\\users\\Sam\\Dev-Projects\\claude-code-sandbox"
-    ]
+    "additionalDirectories": ["/workspace/projects", "/workspace/gitprojects/"]
   }
 }
