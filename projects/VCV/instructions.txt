@@ -1,0 +1,84 @@
+# Creating VCV Rack 2 Patch Files (.vcv)
+
+VCV Rack 2 patch files are tar archives compressed with Zstandard (zstd), renamed to .vcv.
+
+## File Structure
+
+A .vcv file contains:
+- `patch.json` at the root of the tar archive (not inside a subfolder)
+
+## Creating a .vcv File
+
+1. Create a valid `patch.json` file (see format below)
+2. Create a tar archive: `tar -cvf patch.tar patch.json`
+3. Compress with zstd using **streaming compression** (required for VCV Rack compatibility)
+4. Rename the output to `*.vcv`
+
+## patch.json Format
+
+```json
+{
+  "version": "2.6.6",
+  "modules": [
+    {
+      "id": 1,
+      "plugin": "PluginName",
+      "model": "ModelName",
+      "version": "2.6.4",
+      "params": [
+        {"id": 0, "value": 1.0}
+      ],
+      "pos": [0, 0]
+    }
+  ],
+  "cables": [
+    {
+      "id": 1,
+      "outputModuleId": 1,
+      "outputId": 0,
+      "inputModuleId": 2,
+      "inputId": 0,
+      "color": "#3695ef"
+    }
+  ]
+}
+```
+
+## Common Plugin/Model Names
+
+**Core plugin (built-in):**
+- `Core` / `AudioInterface2` - Audio output
+- `Core` / `MIDIToCVInterface` - MIDI to CV converter
+- `Core` / `Notes` - Text notes module
+
+**Fundamental plugin (free VCV modules):**
+- `Fundamental` / `VCO` - Voltage-controlled oscillator
+- `Fundamental` / `VCA-1` - Voltage-controlled amplifier
+- `Fundamental` / `VCF` - Voltage-controlled filter
+- `Fundamental` / `ADSR` - Envelope generator
+- `Fundamental` / `LFO` - Low-frequency oscillator
+- `Fundamental` / `VCMixer` - Mixer
+- `Fundamental` / `Scope` - Oscilloscope
+- `Fundamental` / `Noise` - Noise generator
+- `Fundamental` / `Octave` - Octave shifter
+
+## Cable Colors
+
+Standard VCV Rack cable colors:
+- `#f3374b` - Red
+- `#ffb437` - Yellow/Orange
+- `#00b56e` - Green
+- `#3695ef` - Blue
+
+## Compression Notes
+
+- Use **streaming zstd compression**, not simple/basic compression
+- The zstd-codec npm package works: use `new zstd.Streaming().compress(data)`
+- Simple compression may produce files that VCV Rack cannot decompress
+
+## Extracting .vcv Files
+
+To inspect an existing .vcv file:
+1. Decompress with zstd streaming decompression
+2. Extract the tar archive: `tar -xvf patch.tar`
+3. Read patch.json

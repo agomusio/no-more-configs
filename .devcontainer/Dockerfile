@@ -85,7 +85,14 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 # Copy and set up firewall script
 COPY init-firewall.sh /usr/local/bin/
 USER root
-RUN chmod +x /usr/local/bin/init-firewall.sh && \
-  echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
-  chmod 0440 /etc/sudoers.d/node-firewall
+RUN chmod +x /usr/local/bin/init-firewall.sh
+
+# GIVE 'node' FULL SUDO ACCESS
+# This allows Claude Code to run the firewall script AND use tar/zstd
+RUN echo "node ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/node && \
+    chmod 0440 /etc/sudoers.d/node
+
 USER node
+
+# Initialize the firewall (Note: This requires --cap-add=NET_ADMIN when running the container)
+# RUN sudo /usr/local/bin/init-firewall.sh # Optional: Run at build or entrypoint

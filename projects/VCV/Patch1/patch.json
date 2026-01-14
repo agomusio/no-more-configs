@@ -1,0 +1,95 @@
+{
+  "version": "2.6.6",
+  "modules": [
+    {
+      "id": 1,
+      "plugin": "Core",
+      "model": "AudioInterface2",
+      "version": "2.6.6",
+      "params": [
+        {"id": 0, "value": 1.0}
+      ],
+      "pos": [24, 0]
+    },
+    {
+      "id": 2,
+      "plugin": "Fundamental",
+      "model": "VCO",
+      "version": "2.6.4",
+      "params": [
+        {"id": 0, "value": 1.0},
+        {"id": 1, "value": 1.0},
+        {"id": 2, "value": 0.0},
+        {"id": 3, "value": 0.0},
+        {"id": 4, "value": 0.05},
+        {"id": 5, "value": 0.5},
+        {"id": 6, "value": 1.0},
+        {"id": 7, "value": 0.0}
+      ],
+      "pos": [0, 0]
+    },
+    {
+      "id": 3,
+      "plugin": "Fundamental",
+      "model": "VCA-1",
+      "version": "2.6.4",
+      "params": [
+        {"id": 0, "value": 1.0},
+        {"id": 1, "value": 1.0}
+      ],
+      "pos": [9, 0]
+    },
+    {
+      "id": 4,
+      "plugin": "Core",
+      "model": "MIDIToCVInterface",
+      "version": "2.6.6",
+      "params": [],
+      "data": {
+        "channels": 1,
+        "polyMode": 0,
+        "clockDivision": 24,
+        "midi": {
+          "driver": -11,
+          "deviceName": "QWERTY keyboard (US)",
+          "channel": -1
+        }
+      },
+      "pos": [12, 0]
+    }
+  ],
+  "cables": [
+    {
+      "id": 1,
+      "outputModuleId": 2,
+      "outputId": 0,
+      "inputModuleId": 3,
+      "inputId": 0,
+      "color": "#3695ef"
+    },
+    {
+      "id": 2,
+      "outputModuleId": 3,
+      "outputId": 0,
+      "inputModuleId": 1,
+      "inputId": 0,
+      "color": "#00b56e"
+    },
+    {
+      "id": 3,
+      "outputModuleId": 4,
+      "outputId": 0,
+      "inputModuleId": 2,
+      "inputId": 0,
+      "color": "#ffb437"
+    },
+    {
+      "id": 4,
+      "outputModuleId": 4,
+      "outputId": 1,
+      "inputModuleId": 3,
+      "inputId": 1,
+      "color": "#f3374b"
+    }
+  ]
+}
