@@ -16,7 +16,9 @@
         "anthropic.claude-code",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "eamodio.gitlens"
+        "cloudflare.cloudflare-workers-bindings-extension",
+        "qwtel.sqlite-viewer",
+        "bradlc.vscode-tailwindcss"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -51,11 +53,15 @@
   "workspaceFolder": "/workspace",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
   "waitFor": "postStartCommand",
-  "forwardPorts": [3000],
+  "forwardPorts": [3000, 8787],
   "portsAttributes": {
     "3000": {
-      "label": "Next.js App",
-      "onAutoForward": "notify"
+      "label": "Dev App",
+      "onAutoForward": "silent"
+    },
+    "8787": {
+      "label": "Dev App 2",
+      "onAutoForward": "silent"
     }
   }
 }

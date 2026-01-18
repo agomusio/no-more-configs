@@ -77,7 +77,8 @@ for domain in \
     "github.com" \
     "objects.githubusercontent.com" \
     "api.cloudflare.com" \
-    "update.code.visualstudio.com"; do
+    "update.code.visualstudio.com" \
+    "adventure-alerts-api.sam-ed4.workers.dev"; do
     echo "Resolving $domain..."
     ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
     if [ -z "$ips" ]; then
