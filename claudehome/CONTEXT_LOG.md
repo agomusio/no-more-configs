@@ -7,8 +7,9 @@ This file maintains context across Claude Code sessions. Read this at the start 
 ## Session Log
 
 ### 2026-01-13
+
 - Initial context log created
-- Working directories: `/workspace/claudehome`, `/workspace/projects`
+- Working directories: `/workspace/claudehome`, `/workspace/projects`, `/workspace/gitprojects`
 - Environment: Linux (WSL2), no git repo initialized in claudehome
 
 ---
@@ -24,11 +25,13 @@ _Record learned preferences here as they emerge._
 ## Project Context
 
 ### /workspace/projects
+
 - Status: Added as working directory
 - Contents:
   - `webapp/` - web application project (not yet explored in detail)
 
 ### /workspace/claudehome
+
 - Purpose: Claude Code home directory
 - Contains: `.claude/` config, this context log
 
@@ -66,4 +69,4 @@ _Frequently used commands, paths, or patterns._
 
 ---
 
-*Last updated: 2026-01-13*
+_Last updated: 2026-01-13_
