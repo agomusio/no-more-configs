@@ -13,12 +13,12 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "anthropic.claude-code",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "cloudflare.cloudflare-workers-bindings-extension",
         "qwtel.sqlite-viewer",
-        "bradlc.vscode-tailwindcss"
+        "bradlc.vscode-tailwindcss",
+        "cloudflare.cloudflare-workers-bindings-extension"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -51,7 +51,7 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/gitprojects/adventure-alerts && git config --global --add safe.directory /workspace/gitprojects/claude-aimtrainer && git config --global core.autocrlf input",
   "waitFor": "postStartCommand",
   "forwardPorts": [3000, 8787],
   "portsAttributes": {
