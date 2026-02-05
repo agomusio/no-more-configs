@@ -78,6 +78,7 @@ for domain in \
     "objects.githubusercontent.com" \
     "api.cloudflare.com" \
     "update.code.visualstudio.com" \
+    "json.schemastore.org" \
     "adventure-alerts-api.sam-ed4.workers.dev"; do
     echo "Resolving $domain..."
     ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
