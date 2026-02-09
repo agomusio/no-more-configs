@@ -6,6 +6,7 @@ ENV TZ="$TZ"
 ARG CLAUDE_CODE_VERSION=latest
 
 # Install basic development tools and iptables/ipset
+# ADDED: lsb-release, curl, ca-certificates for Docker install
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   git \
@@ -26,7 +27,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   vim \
   python3-pip \
+  python3-venv \
+  lsb-release \
+  curl \
+  ca-certificates \
+  iputils-ping \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ADDED: Install Docker CLI (Docker-outside-of-Docker)
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg && \
+    echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y docker-ce-cli docker-compose-plugin && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Ensure default node user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
@@ -81,7 +99,26 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
   
 # Install Claude
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+# 1. Switch to root to install system-level packages
+USER root
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    bash \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Switch back to the node user to install Claude
+USER node
+
+# Install Claude Code (it will go into /home/node/.local/bin)
+RUN curl -fsSL https://claude.ai/install.sh | bash -s latest
+
+# 3. Add the node user's local bin to the PATH
+ENV PATH="/home/node/.local/bin:${PATH}"
+
+# Verify as the node user
+RUN claude --version
 
 
 # Copy and set up firewall script
