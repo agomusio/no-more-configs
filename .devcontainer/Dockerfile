@@ -79,7 +79,27 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -x
 
 # Install Claude
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+# 1. Switch to root to install system-level packages
+USER root
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    bash \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Switch back to the node user to install Claude
+USER node
+
+# Install Claude Code (it will go into /home/node/.local/bin)
+RUN curl -fsSL https://claude.ai/install.sh | bash -s latest
+
+# 3. Add the node user's local bin to the PATH
+ENV PATH="/home/node/.local/bin:${PATH}"
+
+# Verify as the node user
+RUN claude --version
+
 
 
 # Copy and set up firewall script
