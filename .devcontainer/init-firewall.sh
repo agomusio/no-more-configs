@@ -78,8 +78,12 @@ for domain in \
     "objects.githubusercontent.com" \
     "api.cloudflare.com" \
     "update.code.visualstudio.com" \
+<<<<<<< HEAD
     "storage.googleapis.com" \
     "pypi.python.org" \
+=======
+    "json.schemastore.org" \
+>>>>>>> ab0f59f585e88e45898a904c6c25947322889283
     "adventure-alerts-api.sam-ed4.workers.dev"; do
     echo "Resolving $domain..."
     ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
