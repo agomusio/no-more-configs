@@ -19,7 +19,6 @@ else
     echo "❌ Host Unreachable: Check init-firewall.sh"
 fi
 
-# Add this to setup-container.sh
 echo "🔍 Checking Langfuse on port 3052..."
 if curl -s -o /dev/null -w "%{http_code}" http://host.docker.internal:3052/api/public/health | grep -q "200"; then
     echo "✅ Langfuse is reachable."
@@ -27,3 +26,9 @@ else
     echo "❌ ERROR: Langfuse unreachable on 3052."
     echo "👉 Run: cd /workspace/claudehome/langfuse-local && sudo docker compose up -d"
 fi
+
+# 5. Restore Git Identity
+git config --global user.email "sam@theoryfarm.com"
+git config --global user.name "agomusio"
+
+git config --get user.email > /dev/null && echo "✅ Git: Identity is set" || echo "❌ Git: Identity MISSING"
