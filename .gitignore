@@ -1,10 +1,20 @@
+# Claude tmp files
 *tmpclaude*
 
+# Node modules
 node_modules/
 
+# OS/machine specific
 *.log
 .DS_Store
 
+# Nested Git repos
 gitprojects/
 
-claudehome/langfuse-local/
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Environment secrets
+.env

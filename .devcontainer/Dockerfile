@@ -117,6 +117,9 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s latest
 # 3. Add the node user's local bin to the PATH
 ENV PATH="/home/node/.local/bin:${PATH}"
 
+# 4. Skip permissions for Claude in WSL
+ENV CLAUDE_BYPASS_PERMISSIONS=true
+
 # Verify as the node user
 RUN claude --version
 

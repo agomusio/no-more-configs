@@ -1,0 +1,20 @@
+{
+  "env": {
+    "TRACE_TO_LANGFUSE": "true",
+    "LANGFUSE_PUBLIC_KEY": "pk-lf-local-claude-code",
+    "LANGFUSE_SECRET_KEY": "YOUR_SECRET_KEY_HERE",
+    "LANGFUSE_HOST": "http://localhost:3050"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/langfuse_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}

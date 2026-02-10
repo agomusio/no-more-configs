@@ -1,0 +1,5 @@
+{
+  "env": {
+    "TRACE_TO_LANGFUSE": "false"
+  }
+}
