@@ -136,5 +136,11 @@ RUN echo "node ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/node && \
 
 USER node
 
+# Add claudey/claudeyr aliases to both shell configs
+RUN echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
+    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
+    echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
+    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
+
 # Initialize the firewall (Note: This requires --cap-add=NET_ADMIN when running the container)
 # RUN sudo /usr/local/bin/init-firewall.sh # Optional: Run at build or entrypoint

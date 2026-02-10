@@ -1,7 +1,10 @@
 {
-  "defaultMode": "bypassPermissions",
   "permissions": {
-    "additionalDirectories": ["/workspace/", "/workspace/gitprojects/adventure-alerts/"]
+    "additionalDirectories": [
+      "/workspace/",
+      "/workspace/gitprojects/adventure-alerts/"
+    ],
+    "defaultMode": "bypassPermissions"
   },
   "env": {
     "TRACE_TO_LANGFUSE": "true",
