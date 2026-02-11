@@ -139,6 +139,32 @@ services:
     volumes:
       - langfuse_postgres_data:/var/lib/postgresql/data
 
+  docker-mcp-gateway:
+    image: docker/mcp-gateway:latest
+    container_name: docker-mcp-gateway
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8811:8811"
+    volumes:
+      - ./mcp/mcp.json:/etc/mcp/mcp.json:ro
+      - ${MCP_WORKSPACE_BIND}:/workspace:rw
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8811/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  docker-mcp-gateway-with-docker:
+    extends:
+      service: docker-mcp-gateway
+    volumes:
+      - ./mcp/mcp.json:/etc/mcp/mcp.json:ro
+      - ${MCP_WORKSPACE_BIND}:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    profiles:
+      - mcp-docker-tools
+
 volumes:
   langfuse_postgres_data:
     driver: local
