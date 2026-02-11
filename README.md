@@ -11,6 +11,7 @@ Windows Host (WSL2)
  |                                                         |
  |   Dev Container (Debian/Node 20)                        |
  |   ├── Claude Code CLI                                   |
+ |   ├── GSD framework    (get-shit-done-cc)               |
  |   ├── langfuse_hook.py  (Stop hook → sends traces)      |
  |   ├── init-firewall.sh  (iptables domain whitelist)     |
  |   └── /var/run/docker.sock  (bind-mounted from host)    |
@@ -43,7 +44,7 @@ The Dev Container uses the **host's Docker engine** via a bind-mounted `/var/run
 code .
 ```
 
-VS Code will detect `.devcontainer/devcontainer.json` and prompt to reopen in the container. On first build, the `postCreateCommand` runs `setup-container.sh`, which:
+VS Code will detect `.devcontainer/devcontainer.json` and prompt to reopen in the container. On first build, the `postCreateCommand` runs `.devcontainer/setup-container.sh`, which:
 
 - Whitelists all git directories (`git config --global --add safe.directory '*'`)
 - Sets line endings for WSL compatibility (`core.autocrlf input`)
@@ -51,6 +52,8 @@ VS Code will detect `.devcontainer/devcontainer.json` and prompt to reopen in th
 - Installs the Langfuse Python SDK (`python3 -m pip install langfuse --break-system-packages`)
 - Verifies connectivity to `host.docker.internal`
 - Health-checks the Langfuse API on port 3052
+
+It then runs `.devcontainer/init-gsd.sh`, which installs the [GSD (Get Shit Done)](https://github.com/glittercowboy/get-shit-done) slash commands into `~/.claude/commands/gsd/` if not already present.
 
 ### 2. Start the Langfuse Stack
 
@@ -109,7 +112,19 @@ Your `~/.claude/settings.json` needs the Langfuse hook registered. Use the examp
 
 The hook fires after every assistant response (the `Stop` event matcher). It reads Claude's transcript files from `~/.claude/projects/`, parses conversation turns, and sends structured traces to Langfuse.
 
-### 5. Test End-to-End
+### 5. Initialize a GSD Project (Optional)
+
+Once inside a Claude Code session, run:
+
+```
+/gsd:new-project
+```
+
+This creates a `.planning/` directory with structured project files (`PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `config.json`). GSD breaks work into atomic tasks sized for fresh context windows, using specialized sub-agents (planner, executor, verifier, researcher).
+
+See `/gsd:help` for the full command list.
+
+### 6. Test End-to-End
 
 1. Start a Claude Code session: `claude`
 2. Send any prompt
@@ -149,6 +164,7 @@ These are the canonical ports, IPs, and paths that the system expects. If any of
 | `/workspace/claudehome/langfuse-local/`        | Langfuse Docker Compose stack + hook source                                |
 | `/workspace/gitprojects/`                      | Working directory for repositories cloned and developed within the sandbox |
 | `/home/node/.claude/`                          | Claude Code config dir (bind-mounted from `%USERPROFILE%\.claude`)         |
+| `/home/node/.claude/commands/gsd/`             | GSD slash commands (installed by `init-gsd.sh`)                            |
 | `/home/node/.claude/hooks/langfuse_hook.py`    | The tracing hook script                                                    |
 | `/home/node/.claude/settings.json`             | Claude Code settings (hook registration + env vars)                        |
 | `/home/node/.claude/state/langfuse_hook.log`   | Hook execution log                                                         |
@@ -186,7 +202,7 @@ Rebuilding the container (e.g., after Dockerfile changes) **does not** affect th
 - Langfuse data is persisted in Docker named volumes (`langfuse_postgres_data`, `langfuse_clickhouse_data`, etc.)
 - Your `.claude/` directory is bind-mounted from the Windows host, so settings and hook state survive rebuilds
 
-However, rebuilding **does** re-run `postCreateCommand` (`setup-container.sh`), which reinstalls the `langfuse` Python package. This is intentional — the package is installed into the container's system Python and is lost on rebuild.
+However, rebuilding **does** re-run `postCreateCommand` (`.devcontainer/setup-container.sh` and `.devcontainer/init-gsd.sh`), which reinstalls the `langfuse` Python package and ensures GSD slash commands are present. This is intentional — the Python package is installed into the container's system Python and is lost on rebuild. GSD commands persist across rebuilds because they're installed into `~/.claude/`, which is bind-mounted from the Windows host.
 
 **To rebuild without downtime:**
 
@@ -290,11 +306,11 @@ Debian's PEP 668 restricts system-wide pip installs. The `--break-system-package
 python3 -m pip install langfuse --break-system-packages
 ```
 
-This is already handled by `setup-container.sh` on container creation.
+This is already handled by `.devcontainer/setup-container.sh` on container creation.
 
 ### Git "dubious ownership" errors
 
-The workspace is bind-mounted from Windows into a Linux container, which causes UID mismatches. The fix is applied automatically by both `postStartCommand` and `setup-container.sh`:
+The workspace is bind-mounted from Windows into a Linux container, which causes UID mismatches. The fix is applied automatically by both `postStartCommand` and `.devcontainer/setup-container.sh`:
 
 ```bash
 git config --global --add safe.directory '*'
@@ -308,7 +324,7 @@ If `docker compose` commands fail with permission errors:
 sudo chmod 666 /var/run/docker.sock
 ```
 
-This is also handled automatically by `setup-container.sh`.
+This is also handled automatically by `.devcontainer/setup-container.sh`.
 
 ### Firewall blocking Langfuse or external services
 
@@ -350,10 +366,11 @@ The hook is designed to be **non-blocking**: all errors exit with code 0 so Clau
 ```
 /workspace/
 ├── .devcontainer/
-│   ├── Dockerfile              # Dev container image (Node 20 + Claude Code + Docker CLI)
+│   ├── Dockerfile              # Dev container image (Node 20 + Claude Code + GSD + Docker CLI)
 │   ├── devcontainer.json       # Container config, mounts, ports, lifecycle hooks
-│   └── init-firewall.sh        # iptables domain whitelist (runs on postStartCommand)
-├── setup-container.sh          # Post-create setup (pip install, git config, health checks)
+│   ├── init-firewall.sh        # iptables domain whitelist (runs on postStartCommand)
+│   ├── init-gsd.sh             # GSD slash command installer (runs on postCreateCommand)
+│   └── setup-container.sh      # Post-create setup (pip install, git config, health checks)
 ├── claudehome/
 │   ├── .claude/
 │   │   └── settings.local.json # Local Claude Code settings overrides
