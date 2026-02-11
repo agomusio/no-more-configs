@@ -566,8 +566,10 @@ The hook is designed to be **non-blocking**: all errors exit with code 0 so Clau
 │   ├── init-firewall.sh        # iptables domain whitelist (runs on postStartCommand)
 │   ├── init-gsd.sh             # GSD slash command installer (runs on postCreateCommand)
 │   └── setup-container.sh      # Post-create setup (pip install, git config, health checks)
+│
 ├── .vscode/
 │   └── settings.json           # Git multi-repo scanning configuration
+│
 ├── claudehome/                 # Claude Code home — always launch from here
 │   ├── CLAUDE.md               # Project-level Claude Code instructions
 │   ├── .claude/
@@ -588,9 +590,11 @@ The hook is designed to be **non-blocking**: all errors exit with code 0 so Clau
 │   │       ├── global-settings.json    # Reference settings.json for tracing
 │   │       └── project-opt-out.json    # Example: disable tracing per-project
 │   └── scripts/                # Verification scripts (MCP, gateway connectivity)
+│
 ├── gitprojects/                # Working directory for repos developed in the sandbox
 │   └── adventure-alerts/       # Hybrid trip-planning & booking intelligence engine
-└── docs/
+│
+└── docs/                       # Home for reviews, suggestions, specs and plans by Codex
 ```
 
 ### Git Multi-Repo Support
