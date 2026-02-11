@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 # 1. Setup Git trust for all directories in this container
 git config --global --add safe.directory '*'
 

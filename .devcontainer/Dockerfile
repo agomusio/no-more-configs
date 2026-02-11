@@ -123,6 +123,8 @@ ENV CLAUDE_BYPASS_PERMISSIONS=true
 # Verify as the node user
 RUN claude --version
 
+# Install GSD (Get Shit Done) framework for Claude Code
+RUN npm install -g get-shit-done-cc
 
 # Copy and set up firewall script
 COPY init-firewall.sh /usr/local/bin/
