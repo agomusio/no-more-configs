@@ -1,11 +1,6 @@
 ---
 name: aa-fullstack
-description: |
-  Adventure Alerts full-stack development skill for Next.js, Cloudflare Workers, Hono, Drizzle ORM,
-  Mantine UI, and edge-first architecture. Use when: building web applications, developing APIs,
-  creating frontends, setting up databases, deploying web apps, or when user mentions React, Next.js,
-  Mantine, Hono, Drizzle, Cloudflare Workers, D1, Durable Objects, Capacitor, Meilisearch,
-  or full-stack development.
+description: Adventure Alerts full-stack development skill for Next.js, Cloudflare Workers, Hono, Drizzle ORM, Mantine UI, and edge-first architecture. Use when building web applications, developing APIs, creating frontends, setting up databases, deploying web apps, or when user mentions React, Next.js, Mantine, Hono, Drizzle, Cloudflare Workers, D1, Durable Objects, Capacitor, Meilisearch, or full-stack development.
 license: MIT
 metadata:
   author: Adventure Alerts
@@ -22,6 +17,7 @@ Expert full-stack web development skill customized for the Adventure Alerts stac
 ## When to Apply
 
 Use this skill when:
+
 - Building complete web applications (monorepo or single-app)
 - Developing edge APIs with Hono on Cloudflare Workers
 - Creating React/Next.js frontends with Mantine UI
@@ -36,6 +32,7 @@ Use this skill when:
 ## Technology Stack
 
 ### Frontend
+
 - **Next.js** (App Router) — SSR, SSG, server components, `use client` boundaries
 - **React** — Modern component patterns, hooks, context
 - **Mantine UI** — Primary component library (DataGrid, Modal, Alert, AppShell, CommandBar)
@@ -44,6 +41,7 @@ Use this skill when:
 - **TypeScript** — Strict type-safe frontend code
 
 ### Backend
+
 - **Cloudflare Workers** — Edge-first serverless runtime (not Node.js)
 - **Hono** — Lightweight web framework for Workers (routing, middleware, context)
 - **Durable Objects** — Stateful coordination, real-time, precision scheduling (Alarms API)
@@ -51,19 +49,23 @@ Use this skill when:
 - **Zod** — Schema validation for request bodies
 
 ### Database
+
 - **Cloudflare D1** — Serverless SQLite at the edge
 - **Drizzle ORM** — Type-safe schema definition, query builder, migrations
 - **Unix milliseconds** — All timestamps stored as integers (`{ mode: 'timestamp_ms' }`)
 
 ### Search (Planned)
+
 - **Meilisearch** — Typo-tolerant, sub-50ms full-text search
 - **Meilisearch JS SDK** — Client for indexing and querying
 
 ### Mobile (Planned)
+
 - **Capacitor JS** — Native iOS/Android wrapper for web apps
 - **Native push notifications**, biometric auth, offline caching
 
 ### DevOps
+
 - **Cloudflare Workers + Wrangler** — API deployment (~5 seconds)
 - **Cloudflare Pages** — Frontend deployment with Git integration
 - **npm workspaces** — Monorepo package management
@@ -72,6 +74,7 @@ Use this skill when:
 ## Architecture Patterns
 
 ### Monorepo Structure (npm workspaces)
+
 ```
 project-root/
 ├── apps/
@@ -98,12 +101,14 @@ project-root/
 ```
 
 **Cross-package rules:**
+
 - `types` is the leaf — imports nothing from other packages
 - `db` exports schemas consumed by `api`
 - `dashboard` accesses `api` via HTTP only — never import from `packages/` into `apps/`
 - Never import from `apps/` into `packages/`
 
 ### Single-App Structure (simpler projects)
+
 ```
 src/
 ├── app/              # Next.js App Router pages
@@ -119,6 +124,7 @@ src/
 ## Best Practices
 
 ### Frontend
+
 1. **Component Design**
    - Use Mantine components as the foundation — avoid reinventing DataGrid, Modal, Alert, etc.
    - Keep components small and focused
@@ -138,6 +144,7 @@ src/
    - Avoid prop drilling — use context for deeply shared state
 
 ### Backend (Hono + Workers)
+
 1. **API Design**
    - Consistent response shapes: `{ success: true, data: T }` or `{ success: false, error: "message" }`
    - Never return bare arrays — wrap in named properties
@@ -164,6 +171,7 @@ src/
 ## Code Examples
 
 ### Hono API Route with Drizzle + D1
+
 ```typescript
 // packages/api/src/routes/trips.ts
 import { Hono } from "hono";
@@ -213,13 +221,17 @@ app.post("/", async (c) => {
     return c.json({ success: false, error: "Trip limit reached" }, 403);
   }
 
-  const trip = await db.insert(trips).values({
-    id: crypto.randomUUID(),
-    userId,
-    name: body.name,
-    startDate: body.startDate,
-    endDate: body.endDate,
-  }).returning().get();
+  const trip = await db
+    .insert(trips)
+    .values({
+      id: crypto.randomUUID(),
+      userId,
+      name: body.name,
+      startDate: body.startDate,
+      endDate: body.endDate,
+    })
+    .returning()
+    .get();
 
   return c.json({ success: true, data: trip }, 201);
 });
@@ -228,6 +240,7 @@ export default app;
 ```
 
 ### Hono App Entry with Bindings
+
 ```typescript
 // packages/api/src/index.ts
 import { Hono } from "hono";
@@ -250,6 +263,7 @@ export { AlertManager } from "./durable/alert-manager";
 ```
 
 ### Drizzle Schema Definition
+
 ```typescript
 // packages/db/src/schema.ts
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
@@ -269,7 +283,9 @@ export const trips = sqliteTable("trips", {
 
 export const activities = sqliteTable("activities", {
   id: text("id").primaryKey(),
-  tripId: text("trip_id").references(() => trips.id).notNull(),
+  tripId: text("trip_id")
+    .references(() => trips.id)
+    .notNull(),
   name: text("name").notNull(),
   targetTimeUtc: integer("target_time_utc", { mode: "timestamp_ms" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
@@ -277,6 +293,7 @@ export const activities = sqliteTable("activities", {
 ```
 
 ### React Component with Mantine
+
 ```typescript
 // apps/dashboard/src/components/TripCard.tsx
 "use client";
@@ -318,6 +335,7 @@ export function TripCard({ trip }: { trip: Trip }) {
 ```
 
 ### Durable Object with Alarms API
+
 ```typescript
 // packages/api/src/durable/alert-manager.ts
 export class AlertManager implements DurableObject {
@@ -361,6 +379,7 @@ export class AlertManager implements DurableObject {
 ```
 
 ## Wrangler Configuration
+
 ```jsonc
 // packages/api/wrangler.jsonc
 {
@@ -371,27 +390,28 @@ export class AlertManager implements DurableObject {
     {
       "binding": "DB",
       "database_name": "my-db",
-      "database_id": "<your-database-id>"
-    }
+      "database_id": "<your-database-id>",
+    },
   ],
   "durable_objects": {
     "bindings": [
       {
         "name": "PRECISION_TIMER",
-        "class_name": "AlertManager"
-      }
-    ]
+        "class_name": "AlertManager",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["AlertManager"]
-    }
-  ]
+      "new_classes": ["AlertManager"],
+    },
+  ],
 }
 ```
 
 ## Migration Workflow
+
 ```bash
 # 1. Edit schema in packages/db/src/schema.ts
 
@@ -408,6 +428,7 @@ cd packages/api && npx wrangler deploy
 ## Output Format
 
 When building features, provide:
+
 1. **File location** — Exact path in the monorepo (e.g., `packages/api/src/routes/trips.ts`)
 2. **Complete code** — Fully functional, typed TypeScript
 3. **Dependencies** — Required npm packages
