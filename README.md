@@ -2,6 +2,8 @@
 
 A VS Code Dev Container environment purpose-built for Claude Code development. Pairs Claude Code with a self-hosted [Langfuse](https://langfuse.com) observability stack, an [MCP gateway](https://github.com/docker/mcp-gateway), custom skills, and a network firewall — all running as sibling containers via Docker-outside-of-Docker. Every Claude conversation is automatically traced and viewable in a local dashboard.
 
+> **Codex:** Place reviews, suggestions, specs, and plans in [`docs/`](docs/). See [`docs/README.md`](docs/README.md) for the index.
+
 ## Architecture Overview
 
 ```
