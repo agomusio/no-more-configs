@@ -19,7 +19,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **FSMCP-01**: Filesystem MCP server is configured in `mcp.json` and started by the gateway via stdio transport
 - [x] **FSMCP-02**: Workspace content is mounted identically in both devcontainer and gateway (`/workspace`) to avoid path mismatch
-- [ ] **FSMCP-03**: Filesystem MCP can read and write files in the workspace directory
+- [x] **FSMCP-03**: Filesystem MCP can read and write files in the workspace directory
 
 ### Security
 
@@ -30,14 +30,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Connectivity
 
-- [ ] **CONN-01**: Gateway is reachable from devcontainer via `host.docker.internal:8811`
+- [x] **CONN-01**: Gateway is reachable from devcontainer via `host.docker.internal:8811`
 - [ ] **CONN-02**: Claude Code auto-connects to MCP gateway on devcontainer start (via `.mcp.json` or `settings.local.json`)
-- [ ] **CONN-03**: Gateway logs are accessible via `docker logs docker-mcp-gateway` for debugging
+- [x] **CONN-03**: Gateway logs are accessible via `docker logs docker-mcp-gateway` for debugging
 
 ### Verification
 
 - [ ] **VERIF-01**: End-to-end test: Claude Code session can invoke filesystem MCP tools (list files, read file, write file)
-- [ ] **VERIF-02**: Health check timing accounts for npx package download delay (`start_period: 20s`)
+- [x] **VERIF-02**: Health check timing accounts for npx package download delay (`start_period: 20s`)
 - [ ] **VERIF-03**: Adding a second MCP server to `mcp.json` and restarting makes it available to Claude Code
 
 ## v2 Requirements
@@ -89,16 +89,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-05 | Phase 1 | ✓ Done |
 | FSMCP-01 | Phase 1 | ✓ Done |
 | FSMCP-02 | Phase 1 | ✓ Done |
-| FSMCP-03 | Phase 2 | Pending |
+| FSMCP-03 | Phase 2 | ✓ Done |
 | SEC-01 | Phase 1 | ✓ Done |
 | SEC-02 | Phase 1 | ✓ Done |
 | SEC-03 | Phase 1 | ✓ Done |
 | SEC-04 | Phase 1 | ✓ Done |
-| CONN-01 | Phase 2 | Pending |
+| CONN-01 | Phase 2 | ✓ Done |
 | CONN-02 | Phase 3 | Pending |
-| CONN-03 | Phase 2 | Pending |
+| CONN-03 | Phase 2 | ✓ Done |
 | VERIF-01 | Phase 3 | Pending |
-| VERIF-02 | Phase 2 | Pending |
+| VERIF-02 | Phase 2 | ✓ Done |
 | VERIF-03 | Phase 3 | Pending |
 
 **Coverage:**
@@ -108,4 +108,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-10*
-*Last updated: 2026-02-10 — Phase 1 requirements verified*
+*Last updated: 2026-02-10 — Phase 2 requirements verified*

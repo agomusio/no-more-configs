@@ -13,7 +13,7 @@ This roadmap delivers MCP (Model Context Protocol) gateway infrastructure for th
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Gateway Infrastructure** - MCP gateway runs as secure sidecar service
-- [ ] **Phase 2: Connectivity & Health Validation** - Gateway is reachable and operational from devcontainer
+- [x] **Phase 2: Connectivity & Health Validation** - Gateway is reachable and operational from devcontainer
 - [ ] **Phase 3: Claude Code Integration** - Claude Code auto-connects to MCP gateway on startup
 
 ## Phase Details
@@ -47,7 +47,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — Validate gateway connectivity, health checks, and filesystem MCP cross-container operations
+- [x] 02-01-PLAN.md — Validate gateway connectivity, health checks, and filesystem MCP cross-container operations
 
 ### Phase 3: Claude Code Integration
 **Goal**: Claude Code auto-connects to MCP gateway on devcontainer startup with zero manual configuration
@@ -71,9 +71,9 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Gateway Infrastructure | 1/1 | ✓ Complete | 2026-02-10 |
-| 2. Connectivity & Health Validation | 0/1 | In progress | - |
+| 2. Connectivity & Health Validation | 1/1 | ✓ Complete | 2026-02-10 |
 | 3. Claude Code Integration | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-10*
-*Last updated: 2026-02-10 — Phase 2 planned*
+*Last updated: 2026-02-10 — Phase 2 complete*
