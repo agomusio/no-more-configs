@@ -37,17 +37,17 @@ Plans:
 ### Phase 2: Connectivity & Health Validation
 **Goal**: Gateway is reachable from devcontainer and filesystem MCP operations work end-to-end
 **Depends on**: Phase 1
-**Requirements**: CONN-01, CONN-02, CONN-03, VERIF-02, FSMCP-03
+**Requirements**: CONN-01, CONN-03, VERIF-02, FSMCP-03
 **Success Criteria** (what must be TRUE):
   1. Devcontainer can reach gateway at host.docker.internal:8811 (or fallback IP)
   2. Gateway logs are accessible via docker logs docker-mcp-gateway for troubleshooting
   3. Filesystem MCP can list files in /workspace from gateway context
   4. Filesystem MCP can read and write files in /workspace with changes visible in devcontainer
   5. Health check timing accounts for npx package download (start_period configured correctly)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 02-01: TBD during planning
+- [ ] 02-01-PLAN.md — Validate gateway connectivity, health checks, and filesystem MCP cross-container operations
 
 ### Phase 3: Claude Code Integration
 **Goal**: Claude Code auto-connects to MCP gateway on devcontainer startup with zero manual configuration
@@ -71,9 +71,9 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Gateway Infrastructure | 1/1 | ✓ Complete | 2026-02-10 |
-| 2. Connectivity & Health Validation | 0/TBD | Not started | - |
+| 2. Connectivity & Health Validation | 0/1 | In progress | - |
 | 3. Claude Code Integration | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-10*
-*Last updated: 2026-02-10 — Phase 1 complete*
+*Last updated: 2026-02-10 — Phase 2 planned*
