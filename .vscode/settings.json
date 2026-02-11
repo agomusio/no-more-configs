@@ -1,7 +1,3 @@
 {
-  "git.scanRepositories": [
-    ".",
-    "gitprojects/adventure-alerts",
-    "gitprojects/claude-aimtrainer"
-  ]
+  "git.scanRepositories": [".", "gitprojects/adventure-alerts"]
 }

@@ -8,8 +8,9 @@ node_modules/
 *.log
 .DS_Store
 
-# Nested Git repos
-gitprojects/
+# Nested Git repos — ignore contents but keep the folder via .gitkeep
+/gitprojects/*
+!/gitprojects/.gitkeep
 
 # Python
 __pycache__/

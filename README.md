@@ -1,32 +1,34 @@
 # Claude Code Sandbox
 
-A VS Code Dev Container environment that pairs Claude Code with a self-hosted [Langfuse](https://langfuse.com) observability stack. Every Claude conversation is automatically traced — prompts, responses, tool calls — and viewable in a local dashboard.
+A VS Code Dev Container environment purpose-built for Claude Code development. Pairs Claude Code with a self-hosted [Langfuse](https://langfuse.com) observability stack, an [MCP gateway](https://github.com/docker/mcp-gateway), custom skills, and a network firewall — all running as sibling containers via Docker-outside-of-Docker. Every Claude conversation is automatically traced and viewable in a local dashboard.
 
 ## Architecture Overview
 
 ```
 Windows Host (WSL2)
  |
- ├── VS Code ──────────────────────────────────────────────┐
- |                                                         |
- |   Dev Container (Debian/Node 20)                        |
- |   ├── Claude Code CLI                                   |
- |   ├── GSD framework    (get-shit-done-cc)               |
- |   ├── langfuse_hook.py  (Stop hook → sends traces)      |
- |   ├── init-firewall.sh  (iptables domain whitelist)     |
- |   └── /var/run/docker.sock  (bind-mounted from host)    |
- |                                                         |
- |   Sidecar Stack (Docker-outside-of-Docker)              |
- |   ├── langfuse-web       :3052 → :3000                  |
- |   ├── langfuse-worker    :3030                          |
- |   ├── postgres           :5433 → :5432                  |
- |   ├── clickhouse         :8124 → :8123                  |
- |   ├── redis              :6379                          |
- |   └── minio              :9090 → :9000                  |
- └─────────────────────────────────────────────────────────┘
+ ├── VS Code ──────────────────────────────────────────────────┐
+ |                                                             |
+ |   Dev Container (Debian/Node 20)                            |
+ |   ├── Claude Code CLI + Custom Skills (aa-fullstack, etc.)  |
+ |   ├── GSD framework         (get-shit-done-cc)              |
+ |   ├── langfuse_hook.py       (Stop hook → sends traces)     |
+ |   ├── gsd-statusline.js      (terminal status line)         |
+ |   ├── init-firewall.sh       (iptables domain whitelist)    |
+ |   └── /var/run/docker.sock   (bind-mounted from host)       |
+ |                                                             |
+ |   Sidecar Stack (Docker-outside-of-Docker)                  |
+ |   ├── langfuse-web          :3052 → :3000                   |
+ |   ├── langfuse-worker       :3030                           |
+ |   ├── docker-mcp-gateway    :8811                           |
+ |   ├── postgres              :5433 → :5432                   |
+ |   ├── clickhouse            :8124 → :8123                   |
+ |   ├── redis                 :6379                           |
+ |   └── minio                 :9090 → :9000                   |
+ └─────────────────────────────────────────────────────────────┘
 ```
 
-The Dev Container uses the **host's Docker engine** via a bind-mounted `/var/run/docker.sock`. The Langfuse stack runs as sibling containers managed by Docker Compose, not nested inside the dev container. Connectivity between the container and the Windows host is bridged through `host.docker.internal`.
+The Dev Container uses the **host's Docker engine** via a bind-mounted `/var/run/docker.sock`. The Langfuse stack and MCP gateway run as sibling containers managed by Docker Compose, not nested inside the dev container. Connectivity between the container and the Windows host is bridged through `host.docker.internal`.
 
 ---
 
@@ -40,11 +42,14 @@ The Dev Container uses the **host's Docker engine** via a bind-mounted `/var/run
 
 ### 1. Open the Dev Container
 
-```
-code .
-```
+Via the command palette (`Ctrl+Shift+P`):
 
-VS Code will detect `.devcontainer/devcontainer.json` and prompt to reopen in the container. On first build, the `postCreateCommand` runs `.devcontainer/setup-container.sh`, which:
+- **`Dev Containers: Open Folder in Container...`** — opens a local folder and builds the container from scratch
+- **`Dev Containers: Reopen in Container`** — reopens the current folder inside an existing container
+
+If you open the folder locally first, VS Code will detect `.devcontainer/devcontainer.json` and show a prompt offering to reopen in the container.
+
+On first build, the `postCreateCommand` runs `.devcontainer/setup-container.sh`, which:
 
 - Whitelists all git directories (`git config --global --add safe.directory '*'`)
 - Sets line endings for WSL compatibility (`core.autocrlf input`)
@@ -62,7 +67,7 @@ If this is your first time, generate credentials first:
 ```bash
 cd /workspace/claudehome/langfuse-local
 ./scripts/generate-env.sh        # Interactive — creates .env with random secrets
-sudo docker compose up -d        # Starts all 6 services
+sudo docker compose up -d        # Starts all 8 services
 ```
 
 Wait 30-60 seconds for initialization, then verify:
@@ -132,6 +137,120 @@ See `/gsd:help` for the full command list.
 
 ---
 
+## Shell Shortcuts
+
+Defined as functions in `~/.zshrc`:
+
+| Command    | Action                                                                       |
+| ---------- | ---------------------------------------------------------------------------- |
+| `claudey`  | `cd /workspace/claudehome && claude --dangerously-skip-permissions`          |
+| `claudeyr` | `cd /workspace/claudehome && claude --dangerously-skip-permissions --resume` |
+
+Both accept extra arguments (e.g. `claudey -p "do something"`). Claude Code is always launched from `/workspace/claudehome` so it picks up the project-level `CLAUDE.md` and `.claude/settings.local.json`.
+
+---
+
+## Custom Skills
+
+Skills are installed at `/workspace/claudehome/.claude/skills/` and provide domain-specific knowledge to Claude Code sessions.
+
+### aa-fullstack
+
+Full-stack development skill for the Adventure Alerts project. Covers:
+
+- **Frontend:** Next.js (App Router), React, Mantine UI, Tailwind CSS
+- **Backend:** Cloudflare Workers, Hono, Durable Objects
+- **Database:** Cloudflare D1, Drizzle ORM
+- **Architecture:** Edge-first monorepo with npm workspaces (`apps/`, `packages/`)
+- **Mobile:** Capacitor JS (planned)
+
+Triggers on: React, Next.js, Mantine, Hono, Drizzle, Cloudflare Workers, D1, Durable Objects, full-stack development.
+
+### aa-cloudflare
+
+Cloudflare platform deployment skill with decision trees for compute, storage, AI/ML, networking, and security. Includes 40+ reference docs covering Workers, Pages, D1, KV, R2, Queues, Durable Objects, Containers, WAF, and more.
+
+Triggers on: deploy, host, publish, or set up a project on Cloudflare.
+
+---
+
+## Hooks & Automation
+
+Claude Code hooks are registered in `~/.claude/settings.json` and fire on specific lifecycle events.
+
+| Event            | Hook                  | Purpose                                                         |
+| ---------------- | --------------------- | --------------------------------------------------------------- |
+| **Stop**         | `langfuse_hook.py`    | Sends conversation traces to local Langfuse after each response |
+| **SessionStart** | `gsd-check-update.js` | Checks for GSD framework updates on session start               |
+| **StatusLine**   | `gsd-statusline.js`   | Renders current GSD state in the terminal status line           |
+
+---
+
+## GSD Framework
+
+[Get Shit Done](https://github.com/glittercowboy/get-shit-done) (v1.18.0) is a project management framework for Claude Code that breaks work into atomic tasks sized for fresh context windows.
+
+**29 slash commands** organized by workflow stage:
+
+- **Project init:** `/gsd:new-project`, `/gsd:new-milestone`, `/gsd:map-codebase`
+- **Planning:** `/gsd:discuss-phase`, `/gsd:research-phase`, `/gsd:plan-phase`, `/gsd:list-phase-assumptions`
+- **Execution:** `/gsd:execute-phase`, `/gsd:quick`, `/gsd:debug`
+- **Verification:** `/gsd:verify-work`, `/gsd:audit-milestone`
+- **Roadmap:** `/gsd:add-phase`, `/gsd:insert-phase`, `/gsd:remove-phase`, `/gsd:progress`
+- **Session management:** `/gsd:pause-work`, `/gsd:resume-work`
+- **Todos:** `/gsd:add-todo`, `/gsd:check-todos`
+
+**11 specialized agents** (installed at `~/.claude/agents/gsd-*.md`):
+
+| Agent                      | Purpose                                      |
+| -------------------------- | -------------------------------------------- |
+| `gsd-planner`              | Plan phase execution with task decomposition |
+| `gsd-executor`             | Execute tasks with state tracking            |
+| `gsd-verifier`             | Verify phase goal completion                 |
+| `gsd-debugger`             | Systematic debugging framework               |
+| `gsd-phase-researcher`     | Research phase domain and constraints        |
+| `gsd-project-researcher`   | Research full project requirements           |
+| `gsd-research-synthesizer` | Synthesize research findings                 |
+| `gsd-roadmapper`           | Create project roadmaps                      |
+| `gsd-plan-checker`         | Verify plan completeness and quality         |
+| `gsd-codebase-mapper`      | Systematically map codebases                 |
+| `gsd-integration-checker`  | Validate component integration               |
+
+---
+
+## MCP Gateway
+
+The Docker MCP Gateway (`docker/mcp-gateway:latest`) provides Model Context Protocol server access to Claude Code sessions.
+
+- **Port:** `127.0.0.1:8811` (loopback-only)
+- **Config:** `/workspace/claudehome/langfuse-local/mcp/mcp.json`
+- **Transport:** stdio (servers run via `npx`)
+- **Current servers:** `@modelcontextprotocol/server-filesystem` (workspace root: `/workspace`)
+
+To add a new MCP server, edit `mcp.json` and restart the gateway:
+
+```bash
+sudo docker compose -f /workspace/claudehome/langfuse-local/docker-compose.yml restart docker-mcp-gateway
+```
+
+---
+
+## VS Code Extensions
+
+Installed via `devcontainer.json`:
+
+| Extension                                          | Purpose                                             |
+| -------------------------------------------------- | --------------------------------------------------- |
+| `dbaeumer.vscode-eslint`                           | JavaScript/TypeScript linting                       |
+| `esbenp.prettier-vscode`                           | Code formatting (default formatter, format-on-save) |
+| `cloudflare.cloudflare-workers-bindings-extension` | Cloudflare Workers development                      |
+| `qwtel.sqlite-viewer`                              | SQLite database inspection                          |
+| `bradlc.vscode-tailwindcss`                        | Tailwind CSS IntelliSense                           |
+
+VS Code is configured with format-on-save, Prettier as default formatter, ESLint auto-fix on save, and zsh as the default terminal.
+
+---
+
 ## The "Golden State" Configuration
 
 These are the canonical ports, IPs, and paths that the system expects. If any of these drift, things break.
@@ -145,8 +264,16 @@ These are the canonical ports, IPs, and paths that the system expects. If any of
 | 5433     | PostgreSQL      | `127.0.0.1:5433 → :5432` | Offset from default to avoid collisions                                                                 |
 | 6379     | Redis           | `127.0.0.1:6379 → :6379` | Default port                                                                                            |
 | 8124     | ClickHouse HTTP | `127.0.0.1:8124 → :8123` | Analytics engine                                                                                        |
+| **8811** | MCP Gateway     | `127.0.0.1:8811 → :8811` | Model Context Protocol gateway                                                                          |
 | 9090     | MinIO S3        | `127.0.0.1:9090 → :9000` | Object storage for media/exports                                                                        |
 | 9091     | MinIO Console   | `127.0.0.1:9091 → :9001` | MinIO admin UI                                                                                          |
+
+Dev Container forwarded ports (via `devcontainer.json`):
+
+| Port | Label     | Purpose                   |
+| ---- | --------- | ------------------------- |
+| 3000 | Dev App   | Development application   |
+| 8787 | Dev App 2 | Secondary dev application |
 
 ### Network Addresses
 
@@ -158,28 +285,39 @@ These are the canonical ports, IPs, and paths that the system expects. If any of
 
 ### Key Paths
 
-| Path                                           | Purpose                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------- |
-| `/workspace`                                   | Workspace root (bind-mounted from Windows)                                 |
-| `/workspace/claudehome/langfuse-local/`        | Langfuse Docker Compose stack + hook source                                |
-| `/workspace/gitprojects/`                      | Working directory for repositories cloned and developed within the sandbox |
-| `/home/node/.claude/`                          | Claude Code config dir (bind-mounted from `%USERPROFILE%\.claude`)         |
-| `/home/node/.claude/commands/gsd/`             | GSD slash commands (installed by `init-gsd.sh`)                            |
-| `/home/node/.claude/hooks/langfuse_hook.py`    | The tracing hook script                                                    |
-| `/home/node/.claude/settings.json`             | Claude Code settings (hook registration + env vars)                        |
-| `/home/node/.claude/state/langfuse_hook.log`   | Hook execution log                                                         |
-| `/home/node/.claude/state/langfuse_state.json` | Incremental processing state (tracks last-processed line per session)      |
-| `/var/run/docker.sock`                         | Host Docker socket (bind-mounted)                                          |
-| `/usr/local/bin/init-firewall.sh`              | Firewall whitelist script (runs on `postStartCommand`)                     |
+| Path                                                | Purpose                                                               |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `/workspace`                                        | Workspace root (bind-mounted from Windows)                            |
+| `/workspace/claudehome/`                            | Claude Code home — Claude always launches from here                   |
+| `/workspace/claudehome/.claude/skills/`             | Custom skills (aa-fullstack, aa-cloudflare)                           |
+| `/workspace/claudehome/.claude/settings.local.json` | Project-level Claude Code settings overrides                          |
+| `/workspace/claudehome/langfuse-local/`             | Langfuse + MCP gateway Docker Compose stack                           |
+| `/workspace/claudehome/langfuse-local/mcp/`         | MCP gateway server configuration                                      |
+| `/workspace/claudehome/.planning/`                  | GSD project planning files (PROJECT.md, ROADMAP.md, phases, research) |
+| `/workspace/claudehome/scripts/`                    | Validation and verification scripts                                   |
+| `/workspace/gitprojects/`                           | Working directory for repositories developed in the sandbox           |
+| `/home/node/.claude/`                               | Claude Code config dir (bind-mounted from `%USERPROFILE%\.claude`)    |
+| `/home/node/.claude/commands/gsd/`                  | GSD slash commands (29 commands, installed by `init-gsd.sh`)          |
+| `/home/node/.claude/agents/`                        | GSD specialized agents (11 agent definitions)                         |
+| `/home/node/.claude/hooks/langfuse_hook.py`         | The tracing hook script                                               |
+| `/home/node/.claude/hooks/gsd-check-update.js`      | GSD update checker (SessionStart hook)                                |
+| `/home/node/.claude/hooks/gsd-statusline.js`        | GSD terminal status line                                              |
+| `/home/node/.claude/settings.json`                  | Claude Code settings (hook registration + env vars)                   |
+| `/home/node/.claude/state/langfuse_hook.log`        | Hook execution log                                                    |
+| `/home/node/.claude/state/langfuse_state.json`      | Incremental processing state (tracks last-processed line per session) |
+| `/var/run/docker.sock`                              | Host Docker socket (bind-mounted)                                     |
+| `/usr/local/bin/init-firewall.sh`                   | Firewall whitelist script (runs on `postStartCommand`)                |
 
 ### Environment Variables
 
 Set via `devcontainer.json` → `containerEnv`:
 
-| Variable            | Value                       | Purpose                       |
-| ------------------- | --------------------------- | ----------------------------- |
-| `CLAUDE_CONFIG_DIR` | `/home/node/.claude`        | Claude Code config location   |
-| `NODE_OPTIONS`      | `--max-old-space-size=4096` | Increase Node.js memory limit |
+| Variable                         | Value                              | Purpose                                         |
+| -------------------------------- | ---------------------------------- | ----------------------------------------------- |
+| `CLAUDE_CONFIG_DIR`              | `/home/node/.claude`               | Claude Code config location                     |
+| `NODE_OPTIONS`                   | `--max-old-space-size=4096`        | Increase Node.js memory limit                   |
+| `POWERLEVEL9K_DISABLE_GITSTATUS` | `true`                             | Disable slow git status in Powerlevel10k prompt |
+| `LANGFUSE_HOST`                  | `http://host.docker.internal:3052` | Langfuse API endpoint (container-level default) |
 
 Set via `~/.claude/settings.json` → `env`:
 
@@ -189,6 +327,72 @@ Set via `~/.claude/settings.json` → `env`:
 | `LANGFUSE_PUBLIC_KEY` | `pk-lf-local-claude-code`          | Auto-provisioned project key                         |
 | `LANGFUSE_SECRET_KEY` | _(from .env)_                      | Generated by `generate-env.sh`                       |
 | `LANGFUSE_HOST`       | `http://host.docker.internal:3052` | Langfuse API endpoint from within the container      |
+
+---
+
+## Firewall
+
+The dev container runs an iptables-based whitelist firewall (`init-firewall.sh`) that executes on every container start via `postStartCommand`. The default policy is **DROP** — only explicitly whitelisted domains are reachable.
+
+### Whitelisted Domains
+
+| Category               | Domains                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **VCS**                | `github.com`, `api.github.com`, `objects.githubusercontent.com` + GitHub IP ranges (fetched dynamically)               |
+| **Package Registries** | `registry.npmjs.org`, `deb.debian.org`, `security.debian.org`, `pypi.python.org`                                       |
+| **Claude/Anthropic**   | `api.anthropic.com`, `statsig.anthropic.com`, `statsig.com`, `sentry.io`                                               |
+| **IDE/Tools**          | `marketplace.visualstudio.com`, `vscode.blob.core.windows.net`, `update.code.visualstudio.com`, `json.schemastore.org` |
+| **Cloud Services**     | `api.cloudflare.com`, `storage.googleapis.com`                                                                         |
+| **Internal**           | `host.docker.internal`, `172.16.0.0/12` (Docker bridge), `192.168.65.0/24` (Docker Desktop)                            |
+
+### Network Policies
+
+- **Loopback:** full accept on `lo`
+- **DNS:** allow UDP/TCP port 53
+- **Stateful:** allow ESTABLISHED/RELATED return traffic
+- **Default:** DROP all other inbound/forward/outbound
+- **Rejection:** ICMP admin-prohibited for debugging
+
+To temporarily allow a blocked domain:
+
+```bash
+IP=$(dig +short example.com | tail -1)
+sudo iptables -I OUTPUT -d "$IP" -j ACCEPT
+```
+
+To permanently add a domain, edit `.devcontainer/init-firewall.sh`.
+
+---
+
+## Installed Tools
+
+### Container Image (Dockerfile)
+
+| Category         | Tools                                                                       |
+| ---------------- | --------------------------------------------------------------------------- |
+| **Runtime**      | Node.js 20, Python 3.11, npm 10, zsh 5.9                                    |
+| **Shell**        | Oh-My-Zsh with Powerlevel10k theme, fzf fuzzy finder, plugins: git + fzf    |
+| **VCS**          | Git 2.39, GitHub CLI (gh) 2.23, git-delta 0.18.2 (syntax-highlighted diffs) |
+| **Docker**       | Docker CLI 29.2, Docker Compose v2 plugin                                   |
+| **Network**      | curl, wget, iptables, ipset, iproute2, dnsutils, aggregate                  |
+| **Editors**      | nano (default), vim                                                         |
+| **Utilities**    | jq, fzf, unzip, man-db, procps, less                                        |
+| **Python**       | langfuse 3.14, openai 2.20, opentelemetry-api 1.39, httpx 0.28              |
+| **npm (global)** | `get-shit-done-cc` 1.18.0, `claude` (latest)                                |
+
+### Bind Mounts & Volumes
+
+| Mount                             | Target                 | Type   | Purpose                                     |
+| --------------------------------- | ---------------------- | ------ | ------------------------------------------- |
+| Host `%USERPROFILE%\.claude`      | `/home/node/.claude`   | Bind   | Claude Code config persists across rebuilds |
+| Host Docker socket                | `/var/run/docker.sock` | Bind   | Docker-outside-of-Docker                    |
+| `claude-code-bashhistory-*`       | `/commandhistory`      | Volume | Shell history persists across rebuilds      |
+| Workspace (from Windows via WSL2) | `/workspace`           | Bind   | Delegated consistency for WSL2 performance  |
+
+### Docker Run Capabilities
+
+- `NET_ADMIN` + `NET_RAW` — required for iptables firewall
+- `--add-host=host.docker.internal:host-gateway` — enables host resolution
 
 ---
 
@@ -204,13 +408,14 @@ Rebuilding the container (e.g., after Dockerfile changes) **does not** affect th
 
 However, rebuilding **does** re-run `postCreateCommand` (`.devcontainer/setup-container.sh` and `.devcontainer/init-gsd.sh`), which reinstalls the `langfuse` Python package and ensures GSD slash commands are present. This is intentional — the Python package is installed into the container's system Python and is lost on rebuild. GSD commands persist across rebuilds because they're installed into `~/.claude/`, which is bind-mounted from the Windows host.
 
-**To rebuild without downtime:**
+**To rebuild**, use the command palette (`Ctrl+Shift+P`):
 
-```bash
-# Langfuse keeps running — it's on the host Docker, not in the container
-# Just rebuild the dev container from VS Code:
-#   Ctrl+Shift+P → "Dev Containers: Rebuild Container"
-```
+- **`Dev Containers: Rebuild Container`** — rebuilds the image and recreates the container in place
+- **`Dev Containers: Rebuild Container Without Cache`** — full rebuild, ignoring Docker layer cache (use after Dockerfile base image changes)
+
+VS Code may also show a popup when it detects changes to `.devcontainer/` files, offering to rebuild automatically.
+
+The Langfuse stack keeps running throughout — it's on the host Docker engine, not inside the container.
 
 ### Updating the Langfuse Stack
 
@@ -326,18 +531,6 @@ sudo chmod 666 /var/run/docker.sock
 
 This is also handled automatically by `.devcontainer/setup-container.sh`.
 
-### Firewall blocking Langfuse or external services
-
-The dev container runs an iptables-based firewall (`init-firewall.sh`) that whitelists specific domains (GitHub, npm, Anthropic API, PyPI, etc.) and blocks everything else. The firewall explicitly allows traffic to `host.docker.internal` and the Docker bridge subnet for Langfuse connectivity.
-
-If a domain is blocked that shouldn't be, add it to the whitelist in `.devcontainer/init-firewall.sh` and rebuild, or manually allow it:
-
-```bash
-# Temporarily allow a domain
-IP=$(dig +short example.com | tail -1)
-sudo iptables -I OUTPUT -d "$IP" -j ACCEPT
-```
-
 ---
 
 ## How the Tracing Hook Works
@@ -371,29 +564,51 @@ The hook is designed to be **non-blocking**: all errors exit with code 0 so Clau
 │   ├── init-firewall.sh        # iptables domain whitelist (runs on postStartCommand)
 │   ├── init-gsd.sh             # GSD slash command installer (runs on postCreateCommand)
 │   └── setup-container.sh      # Post-create setup (pip install, git config, health checks)
-├── claudehome/
+├── .vscode/
+│   └── settings.json           # Git multi-repo scanning configuration
+├── claudehome/                 # Claude Code home — always launch from here
+│   ├── CLAUDE.md               # Project-level Claude Code instructions
 │   ├── .claude/
-│   │   └── settings.local.json # Local Claude Code settings overrides
-│   └── langfuse-local/
-│       ├── docker-compose.yml  # Langfuse stack (6 services)
-│       ├── .env.example        # Credential template
-│       ├── .env                # Generated credentials (git-ignored)
-│       ├── hooks/
-│       │   └── langfuse_hook.py    # The tracing hook
-│       ├── scripts/
-│       │   ├── generate-env.sh     # Interactive credential generator
-│       │   └── validate-setup.sh   # Pre-flight and post-setup validator
-│       └── settings-examples/
-│           ├── global-settings.json    # Reference settings.json for tracing
-│           └── project-opt-out.json    # Example: disable tracing per-project
-└── gitprojects/                # Working directory for repos developed in the sandbox
+│   │   ├── settings.local.json # Local Claude Code settings overrides
+│   │   └── skills/
+│   │       ├── aa-fullstack/   # Adventure Alerts full-stack skill
+│   │       └── aa-cloudflare/  # Cloudflare platform deployment skill
+│   ├── .planning/              # GSD project planning (phases, research, state)
+│   ├── langfuse-local/
+│   │   ├── docker-compose.yml  # Langfuse + MCP gateway stack (8 services)
+│   │   ├── .env                # Generated credentials (git-ignored)
+│   │   ├── mcp/
+│   │   │   └── mcp.json        # MCP gateway server configuration
+│   │   ├── scripts/
+│   │   │   ├── generate-env.sh     # Interactive credential generator
+│   │   │   └── validate-setup.sh   # Pre-flight and post-setup validator
+│   │   └── settings-examples/
+│   │       ├── global-settings.json    # Reference settings.json for tracing
+│   │       └── project-opt-out.json    # Example: disable tracing per-project
+│   └── scripts/                # Verification scripts (MCP, gateway connectivity)
+├── gitprojects/                # Working directory for repos developed in the sandbox
+│   └── adventure-alerts/       # Hybrid trip-planning & booking intelligence engine
+└── docs/
 ```
+
+### Git Multi-Repo Support
+
+VS Code scans multiple repositories within the workspace (configured in `.vscode/settings.json`):
+
+- `/workspace/` — root repo (this sandbox)
+- `/workspace/gitprojects/adventure-alerts/` — Adventure Alerts monorepo
+- `/workspace/gitprojects/claude-aimtrainer/` — (configured, not yet cloned)
 
 ---
 
 ## Acknowledgments
 
-This sandbox stands on two foundations:
+### Infrastructure
 
 - **Dev Container** — Modified from the official [Claude Code Dev Container](https://github.com/anthropics/claude-code) reference configuration, with additions for Docker-outside-of-Docker, the iptables firewall, and WSL2 bridge networking.
 - **Langfuse Observability Stack** — Built from Doneyli de Jesus's [claude-code-langfuse-template](https://github.com/doneyli/claude-code-langfuse-template), as described in his Signal Over Noise newsletter post: [I Built My Own Observability for Claude Code](https://doneyli.substack.com/p/i-built-my-own-observability-for). The hook script, Docker Compose stack, and credential generation tooling in `claudehome/langfuse-local/` originate from that template, adapted here for the containerized WSL2 environment (port 3052, `host.docker.internal` routing, PEP 668 workaround).
+
+### Skills
+
+- **aa-cloudflare** — Forked from [cloudflare-deploy](https://github.com/anthropics/awesome-claude-skills) by OpenAI/skills (Apache-2.0). Original decision trees and product index retained; extended with Hono, Drizzle ORM + D1, Durable Object alarm scheduling, and monorepo deployment patterns.
+- **aa-fullstack** — Forked from [fullstack-developer](https://github.com/anthropics/awesome-claude-skills) by Shubhamsaboo/awesome-llm-apps (MIT). Substantially modified to target the Adventure Alerts technology stack and conventions.
