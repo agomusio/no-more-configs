@@ -143,11 +143,13 @@ services:
     image: docker/mcp-gateway:latest
     container_name: docker-mcp-gateway
     restart: unless-stopped
+    command: ["--transport", "sse", "--port", "8811"]
     ports:
       - "127.0.0.1:8811:8811"
     volumes:
       - ./mcp/mcp.json:/etc/mcp/mcp.json:ro
       - ${MCP_WORKSPACE_BIND}:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8811/health"]
       interval: 10s
