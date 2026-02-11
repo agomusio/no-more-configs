@@ -10,29 +10,31 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 ## Current Position
 
 Phase: 2 of 3 (Connectivity & Health Validation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan Phase 2
-Last activity: 2026-02-10 — Phase 1 complete, verified
+Plan: 1 of 1 in current phase
+Status: Phase 2 complete
+Last activity: 2026-02-11 — Phase 2 Plan 1 complete, gateway validated
 
-Progress: [███░░░░░░░] 33% (1/3 phases)
+Progress: [██████░░░░] 66% (2/3 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 2 min
-- Total execution time: 0.03 hours
+- Total plans completed: 2
+- Average duration: 6 min
+- Total execution time: 0.20 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-gateway-infrastructure | 1 | 2 min | 2 min |
+| 02-connectivity-health-validation | 1 | 10 min | 10 min |
 
 **Recent Plans:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 02-connectivity-health-validation | 01 | 10 min | 2 | 2 |
 | 01-gateway-infrastructure | 01 | 2 min | 2 | 3 |
 
 ## Accumulated Context
@@ -47,8 +49,10 @@ Recent decisions affecting current work:
 - MVP scope: Start with filesystem MCP only (lowest risk, validates gateway infrastructure)
 - Config management: Config-driven server management via mcp.json (makes adding servers trivial)
 - Loopback binding: 127.0.0.1:8811 prevents LAN exposure (security-first)
-- Profile-gated Docker socket: mcp-docker-tools profile keeps Docker socket disabled by default
+- **Docker socket mount (revised):** Docker socket now mounted read-only by default (required for gateway startup, overrides Phase 1 profile-gating decision)
+- **SSE transport mode:** Gateway requires explicit --transport sse --port 8811 to run HTTP server (defaults to stdio mode)
 - Health check timing: 20s start_period allows npx download on first run
+- **Volume alignment:** MCP_WORKSPACE_BIND must match devcontainer workspaceMount source (environment-specific configuration)
 
 ### Pending Todos
 
@@ -60,6 +64,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-10 (Phase 1 execution + verification)
-Stopped at: Phase 1 complete, ready for Phase 2 planning
+Last session: 2026-02-11 (Phase 2 execution + validation)
+Stopped at: Phase 2 complete, gateway validated and reachable
 Resume file: None
