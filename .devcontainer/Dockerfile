@@ -63,9 +63,6 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
-# Set `DEVCONTAINER` environment variable to help with orientation
-ENV DEVCONTAINER=true
-
 # Create workspace and config directories and set permissions
 RUN mkdir -p /workspace /home/node/.claude && \
   chown -R node:node /workspace /home/node/.claude
@@ -78,8 +75,20 @@ RUN ARCH=$(dpkg --print-architecture) && \
   sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
 
+# Copy and set up firewall script
+COPY init-firewall.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/init-firewall.sh
+
+# GIVE 'node' FULL SUDO ACCESS
+# This allows Claude Code to run the firewall script AND use tar/zstd
+RUN echo "node ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/node && \
+    chmod 0440 /etc/sudoers.d/node
+
 # Set up non-root user
 USER node
+
+# Set `DEVCONTAINER` environment variable to help with orientation
+ENV DEVCONTAINER=true
 
 # Install global packages
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
@@ -102,27 +111,13 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
   -x
 
-  
-# Install Claude
-# 1. Switch to root to install system-level packages
-USER root
-
-RUN apt-get update && apt-get install -y \
-    curl \
-    bash \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# 2. Switch back to the node user to install Claude
-USER node
-
 # Install Claude Code (it will go into /home/node/.local/bin)
-RUN curl -fsSL https://claude.ai/install.sh | bash -s latest
+RUN curl -fsSL https://claude.ai/install.sh | bash -s -- "${CLAUDE_CODE_VERSION}"
 
-# 3. Add the node user's local bin to the PATH
+# Add the node user's local bin to the PATH
 ENV PATH="/home/node/.local/bin:${PATH}"
 
-# 4. Skip permissions for Claude in WSL
+# Skip permissions for Claude in WSL
 ENV CLAUDE_BYPASS_PERMISSIONS=true
 
 # Verify as the node user
@@ -131,23 +126,11 @@ RUN claude --version
 # Install GSD (Get Shit Done) framework for Claude Code
 RUN npm install -g get-shit-done-cc
 
-# Copy and set up firewall script
-COPY init-firewall.sh /usr/local/bin/
-USER root
-RUN chmod +x /usr/local/bin/init-firewall.sh
-
-# GIVE 'node' FULL SUDO ACCESS
-# This allows Claude Code to run the firewall script AND use tar/zstd
-RUN echo "node ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/node && \
-    chmod 0440 /etc/sudoers.d/node
-
-USER node
-
 # Add claudey/claudeyr aliases to both shell configs
-RUN echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
-    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
-    echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
-    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
+RUN echo "alias claudey='cd /workspace/claudehome && claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
+    echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
+    echo "alias claudey='cd /workspace/claudehome && claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
+    echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
 
 # Initialize the firewall (Note: This requires --cap-add=NET_ADMIN when running the container)
 # RUN sudo /usr/local/bin/init-firewall.sh # Optional: Run at build or entrypoint

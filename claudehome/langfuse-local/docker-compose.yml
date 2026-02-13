@@ -1,7 +1,7 @@
 services:
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:3
-    restart: always
+    restart: unless-stopped
     depends_on: &langfuse-depends-on
       postgres:
         condition: service_healthy
@@ -13,6 +13,21 @@ services:
         condition: service_healthy
     ports:
       - 127.0.0.1:3030:3030
+    mem_limit: 1024m
+    cpus: 1.5
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3030/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     environment: &langfuse-worker-env
       NEXTAUTH_URL: http://localhost:3052
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres
@@ -48,10 +63,25 @@ services:
 
   langfuse-web:
     image: docker.io/langfuse/langfuse:3
-    restart: always
+    restart: unless-stopped
     depends_on: *langfuse-depends-on
     ports:
       - 127.0.0.1:3052:3000
+    mem_limit: 768m
+    cpus: 1.0
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     environment:
       <<: *langfuse-worker-env
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
@@ -67,8 +97,14 @@ services:
 
   clickhouse:
     image: docker.io/clickhouse/clickhouse-server
-    restart: always
+    restart: unless-stopped
     user: "101:101"
+    mem_limit: 2048m
+    cpus: 2.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: clickhouse
@@ -84,13 +120,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 1s
+      start_period: 15s
 
   minio:
     image: cgr.dev/chainguard/minio
-    restart: always
+    restart: unless-stopped
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    mem_limit: 512m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -101,17 +143,26 @@ services:
       - langfuse_minio_data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
-      interval: 1s
+      interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 1s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: docker.io/redis:7
-    restart: always
+    restart: unless-stopped
     command: >
       --requirepass ${REDIS_AUTH}
       --maxmemory-policy noeviction
+    mem_limit: 256m
+    cpus: 0.5
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     ports:
       - 127.0.0.1:6379:6379
     healthcheck:
@@ -119,15 +170,23 @@ services:
       interval: 3s
       timeout: 10s
       retries: 10
+      start_period: 5s
 
   postgres:
     image: docker.io/postgres:17
-    restart: always
+    restart: unless-stopped
+    mem_limit: 1024m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
       timeout: 3s
       retries: 10
+      start_period: 10s
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -144,6 +203,13 @@ services:
     container_name: docker-mcp-gateway
     restart: unless-stopped
     command: ["--transport", "sse", "--port", "8811"]
+    mem_limit: 256m
+    cpus: 0.5
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:8811:8811"
     volumes:

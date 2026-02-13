@@ -38,7 +38,8 @@
           "zsh": {
             "path": "zsh"
           }
-        }
+        },
+        "telemetry.telemetryLevel": "off"
       }
     }
   },

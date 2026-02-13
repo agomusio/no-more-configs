@@ -6,6 +6,11 @@ echo ">>> Starting Firewall Configuration..."
 
 # --- 1. PRE-FLIGHT CHECKS & VARIABLES ---
 
+CACHE_DIR="/var/cache/devcontainer-firewall"
+GH_CACHE_FILE="$CACHE_DIR/github-meta.json"
+DNS_CACHE_FILE="$CACHE_DIR/dns-resolved.txt"
+CACHE_MAX_AGE=86400  # 24 hours
+
 # Detect Host IP (WSL Gateway)
 HOST_IP=$(ip route | grep default | cut -d" " -f3)
 if [ -z "$HOST_IP" ]; then
@@ -98,47 +103,87 @@ iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 ipset create allowed-domains hash:net
 
-# Fetch GitHub Meta
+mkdir -p "$CACHE_DIR"
+
+# --- 6a. GitHub IP Ranges (cached with TTL) ---
+
+cache_is_fresh() {
+    [ -s "$GH_CACHE_FILE" ] && \
+    [ "$(( $(date +%s) - $(stat -c %Y "$GH_CACHE_FILE") ))" -lt "$CACHE_MAX_AGE" ]
+}
+
 echo "Fetching GitHub IP ranges..."
-gh_ranges=$(curl -s https://api.github.com/meta)
-if [ -z "$gh_ranges" ] || ! echo "$gh_ranges" | jq -e '.web and .api and .git' >/dev/null; then
-    echo "ERROR: Failed to fetch valid GitHub meta data"
-    exit 1
+if cache_is_fresh; then
+    echo "  Using cached GitHub meta (age < 24h)"
+    gh_ranges=$(cat "$GH_CACHE_FILE")
+else
+    if gh_new=$(curl --connect-timeout 5 --max-time 10 --retry 2 --retry-delay 1 \
+                     -sf https://api.github.com/meta 2>/dev/null) && \
+       echo "$gh_new" | jq -e '.web and .api and .git' >/dev/null 2>&1; then
+        echo "  Fetched fresh GitHub meta from API"
+        printf '%s' "$gh_new" > "$GH_CACHE_FILE.tmp" && mv "$GH_CACHE_FILE.tmp" "$GH_CACHE_FILE"
+        gh_ranges="$gh_new"
+    elif [ -s "$GH_CACHE_FILE" ]; then
+        echo "  WARN: GitHub API unreachable; using stale cached ranges"
+        gh_ranges=$(cat "$GH_CACHE_FILE")
+    else
+        echo "ERROR: No GitHub ranges available (API failed + no cache)"
+        exit 1
+    fi
 fi
 
 echo "Processing GitHub IPs..."
-# Add GitHub ranges
 echo "$gh_ranges" | jq -r '(.web + .api + .git)[]' | aggregate -q | while read -r cidr; do
     ipset add allowed-domains "$cidr" -exist
 done
 
-# Resolve other domains
-for domain in \
-    "registry.npmjs.org" \
-    "api.anthropic.com" \
-    "sentry.io" \
-    "statsig.anthropic.com" \
-    "statsig.com" \
-    "marketplace.visualstudio.com" \
-    "vscode.blob.core.windows.net" \
-    "deb.debian.org" \
-    "security.debian.org" \
-    "github.com" \
-    "objects.githubusercontent.com" \
-    "api.cloudflare.com" \
-    "update.code.visualstudio.com" \
-    "storage.googleapis.com" \
-    "pypi.python.org" \
-    "json.schemastore.org" \
-    "adventure-alerts-api.sam-ed4.workers.dev"; do
-    
-    echo "Resolving $domain..."
-    dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}' | while read -r ip; do
-        if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            ipset add allowed-domains "$ip" -exist
-        fi
-    done
-done
+# --- 6b. Domain DNS Resolution (parallel) ---
+
+DOMAINS=(
+    "registry.npmjs.org"
+    "registry.npmjs.com"
+    "api.anthropic.com"
+    "sentry.io"
+    "statsig.anthropic.com"
+    "statsig.com"
+    "marketplace.visualstudio.com"
+    "gallerycdn.vsassets.io"
+    "gallery.vsassets.io"
+    "vsassets.io"
+    "vscode.blob.core.windows.net"
+    "deb.debian.org"
+    "security.debian.org"
+    "github.com"
+    "objects.githubusercontent.com"
+    "uploads.github.com"
+    "codeload.github.com"
+    "api.cloudflare.com"
+    "dash.cloudflare.com"
+    "workers.dev"
+    "update.code.visualstudio.com"
+    "storage.googleapis.com"
+    "pypi.python.org"
+    "pypi.org"
+    "files.pythonhosted.org"
+    "json.schemastore.org"
+    "adventure-alerts-api.sam-ed4.workers.dev"
+)
+
+resolve_domain() {
+    local domain="$1"
+    dig +noall +answer A "$domain" 2>/dev/null | awk '$4 == "A" {print $5}'
+}
+export -f resolve_domain
+
+echo "Resolving ${#DOMAINS[@]} domains in parallel..."
+RESOLVED_IPS=$(printf '%s\n' "${DOMAINS[@]}" | xargs -P 8 -I{} bash -c 'resolve_domain "$@"' _ {} | sort -u)
+
+echo "  Resolved $(echo "$RESOLVED_IPS" | wc -l) unique IPs"
+while read -r ip; do
+    if [[ -n "$ip" && "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        ipset add allowed-domains "$ip" -exist
+    fi
+done <<< "$RESOLVED_IPS"
 
 # Apply the Allow List
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
@@ -156,19 +201,19 @@ iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 echo ">>> Firewall Configured. Verifying..."
 
 # Verification: Should Fail
-if curl --connect-timeout 2 https://example.com >/dev/null 2>&1; then
-    echo "❌ ERROR: Firewall failed - reached https://example.com"
+if curl --connect-timeout 2 --max-time 5 https://example.com >/dev/null 2>&1; then
+    echo "ERROR: Firewall failed - reached https://example.com"
     exit 1
 else
-    echo "✅ Success: Blocked https://example.com"
+    echo "Success: Blocked https://example.com"
 fi
 
 # Verification: Should Pass
-if ! curl --connect-timeout 5 https://api.github.com/zen >/dev/null 2>&1; then
-    echo "❌ ERROR: Firewall failed - blocked https://api.github.com"
+if ! curl --connect-timeout 5 --max-time 10 https://api.github.com/zen >/dev/null 2>&1; then
+    echo "ERROR: Firewall failed - blocked https://api.github.com"
     exit 1
 else
-    echo "✅ Success: Reached https://api.github.com"
+    echo "Success: Reached https://api.github.com"
 fi
 
 echo ">>> Firewall setup complete."
