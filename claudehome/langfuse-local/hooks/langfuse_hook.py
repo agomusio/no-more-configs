@@ -16,6 +16,7 @@ Opt-in: Only runs when TRACE_TO_LANGFUSE=true is set.
 Graceful failure: All errors exit 0 (non-blocking).
 """
 
+import fcntl
 import json
 import os
 import re
@@ -33,6 +34,7 @@ except ImportError:
 # Configuration
 LOG_FILE = Path.home() / ".claude" / "state" / "langfuse_hook.log"
 STATE_FILE = Path.home() / ".claude" / "state" / "langfuse_state.json"
+LOCK_FILE = Path.home() / ".claude" / "state" / "langfuse_state.lock"
 DEBUG = os.environ.get("CC_LANGFUSE_DEBUG", "").lower() == "true"
 LOG_MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB max log size
 LOG_BACKUP_COUNT = 3  # Keep 3 rotated logs
@@ -110,19 +112,48 @@ def sanitize_value(value: Any) -> Any:
 
 
 def load_state() -> dict:
-    """Load the state file containing session tracking info."""
+    """Load the state file with corruption recovery.
+
+    If the state file is malformed, backs it up and returns empty state.
+    """
     if not STATE_FILE.exists():
         return {}
     try:
-        return json.loads(STATE_FILE.read_text())
-    except (json.JSONDecodeError, IOError):
+        data = json.loads(STATE_FILE.read_text())
+        if not isinstance(data, dict):
+            raise ValueError("State file root is not a dict")
+        return data
+    except (json.JSONDecodeError, ValueError, IOError) as e:
+        # Back up corrupted state file
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        corrupt_path = STATE_FILE.with_suffix(f".json.corrupt.{ts}")
+        try:
+            STATE_FILE.rename(corrupt_path)
+            log("WARN", f"Corrupt state file moved to {corrupt_path}: {e}")
+        except OSError:
+            log("WARN", f"Corrupt state file could not be backed up: {e}")
         return {}
 
 
 def save_state(state: dict) -> None:
-    """Save the state file."""
+    """Save state atomically with file locking.
+
+    Uses fcntl.flock for mutual exclusion and atomic rename for crash safety.
+    """
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, indent=2))
+    tmp_file = STATE_FILE.with_suffix(".json.tmp")
+    try:
+        with open(LOCK_FILE, "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            tmp_file.write_text(json.dumps(state, indent=2))
+            os.replace(str(tmp_file), str(STATE_FILE))
+    except (IOError, OSError) as e:
+        log("ERROR", f"Failed to save state: {e}")
+        # Clean up temp file on failure
+        try:
+            tmp_file.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def get_content(msg: dict) -> Any:
@@ -212,50 +243,41 @@ def extract_project_name(project_dir: Path) -> str:
     return dir_name
 
 
-def find_latest_transcript() -> tuple[str, Path, str] | None:
-    """Find the most recently modified transcript file.
+def find_all_transcripts() -> list[tuple[str, Path, str]]:
+    """Find all transcript files across all project directories.
 
     Claude Code stores transcripts as .jsonl files in:
     ~/.claude/projects/<project-dir>/<session-id>.jsonl
 
-    Returns: (session_id, transcript_path, project_name) or None
+    Returns: list of (session_id, transcript_path, project_name), sorted by mtime (oldest first)
     """
     projects_dir = Path.home() / ".claude" / "projects"
 
     if not projects_dir.exists():
         debug(f"Projects directory not found: {projects_dir}")
-        return None
+        return []
 
-    latest_file = None
-    latest_mtime = 0
-    latest_project_dir = None
+    transcripts = []
 
-    # Scan all project directories for transcript files
     for project_dir in projects_dir.iterdir():
         if not project_dir.is_dir():
             continue
         for transcript_file in project_dir.glob("*.jsonl"):
-            mtime = transcript_file.stat().st_mtime
-            if mtime > latest_mtime:
-                latest_mtime = mtime
-                latest_file = transcript_file
-                latest_project_dir = project_dir
+            try:
+                mtime = transcript_file.stat().st_mtime
+                first_line = transcript_file.read_text().split("\n")[0]
+                first_msg = json.loads(first_line)
+                session_id = first_msg.get("sessionId", transcript_file.stem)
+                project_name = extract_project_name(project_dir)
+                transcripts.append((session_id, transcript_file, project_name, mtime))
+            except (json.JSONDecodeError, IOError, IndexError) as e:
+                debug(f"Skipping unreadable transcript {transcript_file}: {e}")
+                continue
 
-    if latest_file and latest_project_dir:
-        try:
-            # Read first line to get session ID
-            first_line = latest_file.read_text().split("\n")[0]
-            first_msg = json.loads(first_line)
-            session_id = first_msg.get("sessionId", latest_file.stem)
-            project_name = extract_project_name(latest_project_dir)
-            debug(f"Found transcript: {latest_file}, session: {session_id}, project: {project_name}")
-            return (session_id, latest_file, project_name)
-        except (json.JSONDecodeError, IOError, IndexError) as e:
-            debug(f"Error reading transcript {latest_file}: {e}")
-            return None
+    # Sort by mtime ascending (oldest first) so newest state is written last
+    transcripts.sort(key=lambda t: t[3])
 
-    debug("No transcript files found")
-    return None
+    return [(sid, path, proj) for sid, path, proj, _ in transcripts]
 
 
 def create_trace(
@@ -381,7 +403,7 @@ def process_transcript(langfuse: Langfuse, session_id: str, transcript_file: Pat
     This function implements incremental processing:
     - Reads the state file to find where we left off
     - Processes only new messages since last run
-    - Groups messages into turns (user → assistant → tools)
+    - Groups messages into turns (user -> assistant -> tools)
     - Creates a Langfuse trace for each complete turn
     - Updates state with new position
 
@@ -401,14 +423,26 @@ def process_transcript(langfuse: Langfuse, session_id: str, transcript_file: Pat
         debug(f"No new lines to process (last: {last_line}, total: {total_lines})")
         return 0
 
-    # Parse new messages
+    # Parse new messages, tracking parse failures
     new_messages = []
+    bad_line_count = 0
+    last_valid_line = last_line
     for i in range(last_line, total_lines):
         try:
             msg = json.loads(lines[i])
             new_messages.append(msg)
-        except json.JSONDecodeError:
-            continue
+            last_valid_line = i + 1
+        except json.JSONDecodeError as e:
+            bad_line_count += 1
+            # If it's the very last line, it may be a partial write — don't advance past it
+            if i == total_lines - 1:
+                log("WARN", f"Skipping incomplete tail line {i + 1} in {transcript_file.name} (may be partial write)")
+                last_valid_line = i  # Don't advance past this line
+            else:
+                log("WARN", f"Malformed JSONL at line {i + 1} in {transcript_file.name}: {e}")
+
+    if bad_line_count > 0:
+        log("INFO", f"Session {session_id}: {bad_line_count} malformed line(s) out of {total_lines - last_line} new")
 
     if not new_messages:
         return 0
@@ -416,7 +450,7 @@ def process_transcript(langfuse: Langfuse, session_id: str, transcript_file: Pat
     debug(f"Processing {len(new_messages)} new messages")
 
     # Group messages into turns
-    # A turn is: user message → assistant message(s) → tool results
+    # A turn is: user message -> assistant message(s) -> tool results
     turns = 0
     current_user = None
     current_assistants = []
@@ -485,10 +519,11 @@ def process_transcript(langfuse: Langfuse, session_id: str, transcript_file: Pat
         turn_num = turn_count + turns
         create_trace(langfuse, session_id, turn_num, current_user, current_assistants, current_tool_results, project_name)
 
-    # Update state
+    # Update state atomically
     state[session_id] = {
-        "last_line": total_lines,
+        "last_line": last_valid_line,
         "turn_count": turn_count + turns,
+        "bad_line_count": session_state.get("bad_line_count", 0) + bad_line_count,
         "updated": datetime.now(timezone.utc).isoformat(),
     }
     save_state(state)
@@ -526,32 +561,38 @@ def main():
         log("ERROR", f"Failed to initialize Langfuse client: {e}")
         sys.exit(0)
 
-    # Load state
+    # Load state (with corruption recovery)
     state = load_state()
 
-    # Find latest transcript
-    result = find_latest_transcript()
-    if not result:
-        debug("No transcript file found")
+    # Find all active transcripts
+    transcripts = find_all_transcripts()
+    if not transcripts:
+        debug("No transcript files found")
         sys.exit(0)
 
-    session_id, transcript_file, project_name = result
+    log("INFO", f"Found {len(transcripts)} transcript(s) to process")
 
-    debug(f"Processing session: {session_id}, project: {project_name}")
-
-    # Process transcript and create traces
+    # Process all transcripts incrementally
+    total_turns = 0
     try:
-        turns = process_transcript(langfuse, session_id, transcript_file, state, project_name)
+        for session_id, transcript_file, project_name in transcripts:
+            log("INFO", f"Processing session {session_id} ({project_name}) from {transcript_file.name}")
+            turns = process_transcript(langfuse, session_id, transcript_file, state, project_name)
+            total_turns += turns
+            if turns > 0:
+                session_state = state.get(session_id, {})
+                log("INFO", f"  Emitted {turns} turn(s), cursor at line {session_state.get('last_line', '?')}, total turns: {session_state.get('turn_count', '?')}")
+
         langfuse.flush()
         duration = (datetime.now() - script_start).total_seconds()
-        log("INFO", f"Processed {turns} turns in {duration:.1f}s")
+        log("INFO", f"Done: {total_turns} turn(s) across {len(transcripts)} session(s) in {duration:.1f}s")
 
         # Warn if hook is taking too long
         if duration > 180:
             log("WARN", f"Hook took {duration:.1f}s (>3min), consider optimizing")
 
     except Exception as e:
-        log("ERROR", f"Failed to process transcript: {e}")
+        log("ERROR", f"Failed to process transcripts: {e}")
         import traceback
         debug(traceback.format_exc())
     finally:

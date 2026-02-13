@@ -12,5 +12,5 @@ Outputs from ChatGPT Codex reviews, suggestions, and plans for this repository. 
 | `codex-dockerfile-audit.md`     | 5.2           | 2026-02-11 | ~~Done~~ Audit of `.devcontainer/Dockerfile` with image-size and caching recommendations |
 | `codex-startup-latency-audit.md`| 5.2           | 2026-02-11 | ~~Done~~ Startup firewall latency analysis with API caching/fallback design |
 | `codex-compose-hardening-audit.md` | 5.2        | 2026-02-11 | ~~Done~~ Security/reliability hardening plan for Langfuse sidecar compose stack |
-| `codex-langfuse-hook-robustness.md` | 5.2      | 2026-02-11 | Concurrency, crash-safety, and observability review of Langfuse Stop hook |
+| `codex-langfuse-hook-robustness.md` | 5.2      | 2026-02-11 | ~~Done~~ Concurrency, crash-safety, and observability review of Langfuse Stop hook |
 | `codex-firewall-whitelist-audit.md` | 5.2      | 2026-02-11 | ~~Done~~ Domain allowlist gap analysis for npm/pip/gh/wrangler/Claude workflows |
