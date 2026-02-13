@@ -2,15 +2,28 @@
 
 Outputs from ChatGPT Codex reviews, suggestions, and plans for this repository. Files here are Codex-generated artifacts — specs, RFCs, audits, and recommendations — preserved for reference.
 
-## Contents
+## Active
 
-| File                            | Codex Version | Date       | Description                                               |
-| ------------------------------- | ------------- | ---------- | --------------------------------------------------------- |
-| `codex-mcp-integration-spec.md` | 5.3           | 2026-02-10 | MCP gateway integration RFC (implemented in phases 01-02) |
-| `codex-setup.sh`                | —             | 2026-02-11 | Codex sandbox setup script (linters, analysis tools)      |
-| `codex-maintenance.sh`          | —             | 2026-02-11 | Codex cached container maintenance (verify tools, re-run setup if needed) |
-| `codex-dockerfile-audit.md`     | 5.2           | 2026-02-11 | ~~Done~~ Audit of `.devcontainer/Dockerfile` with image-size and caching recommendations |
-| `codex-startup-latency-audit.md`| 5.2           | 2026-02-11 | ~~Done~~ Startup firewall latency analysis with API caching/fallback design |
-| `codex-compose-hardening-audit.md` | 5.2        | 2026-02-11 | ~~Done~~ Security/reliability hardening plan for Langfuse sidecar compose stack |
-| `codex-langfuse-hook-robustness.md` | 5.2      | 2026-02-11 | ~~Done~~ Concurrency, crash-safety, and observability review of Langfuse Stop hook |
-| `codex-firewall-whitelist-audit.md` | 5.2      | 2026-02-11 | ~~Done~~ Domain allowlist gap analysis for npm/pip/gh/wrangler/Claude workflows |
+No unaddressed audits at this time.
+
+## Utilities
+
+| File                | Source | Date       | Description                                                              |
+| ------------------- | ------ | ---------- | ------------------------------------------------------------------------ |
+| `codex-setup.sh`    | —      | 2026-02-11 | Codex sandbox setup script (linters, analysis tools)                     |
+| `codex-maintenance.sh` | —   | 2026-02-11 | Codex cached container maintenance (verify tools, re-run setup if needed) |
+
+## Archive
+
+Completed audits and specs, organized by date.
+
+### 2026-02-11
+
+| File | Codex Version | Description |
+| ---- | ------------- | ----------- |
+| [`codex-dockerfile-audit.md`](archive/2026-02-11/codex-dockerfile-audit.md) | 5.2 | Audit of `.devcontainer/Dockerfile` — image-size and caching recommendations |
+| [`codex-startup-latency-audit.md`](archive/2026-02-11/codex-startup-latency-audit.md) | 5.2 | Startup firewall latency analysis — API caching/fallback design |
+| [`codex-compose-hardening-audit.md`](archive/2026-02-11/codex-compose-hardening-audit.md) | 5.2 | Security/reliability hardening plan for Langfuse sidecar compose stack |
+| [`codex-langfuse-hook-robustness.md`](archive/2026-02-11/codex-langfuse-hook-robustness.md) | 5.2 | Concurrency, crash-safety, and observability review of Langfuse Stop hook |
+| [`codex-firewall-whitelist-audit.md`](archive/2026-02-11/codex-firewall-whitelist-audit.md) | 5.2 | Domain allowlist gap analysis for npm/pip/gh/wrangler/Claude workflows |
+| [`codex-mcp-integration-spec.md`](archive/2026-02-11/codex-mcp-integration-spec.md) | 5.3 | MCP gateway integration RFC (implemented in phases 01-02) |
