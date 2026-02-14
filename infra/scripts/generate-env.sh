@@ -132,6 +132,35 @@ echo ""
 echo -e "${YELLOW}IMPORTANT: Save these credentials securely!${NC}"
 echo "The .env file is git-ignored and won't be committed."
 echo ""
+
+# Write Langfuse project keys back to secrets.json (CRD-04)
+SECRETS_FILE="/workspace/secrets.json"
+if command -v jq &> /dev/null; then
+    if [ -f "$SECRETS_FILE" ]; then
+        UPDATED=$(jq \
+            --arg pk "pk-lf-local-claude-code" \
+            --arg sk "$PROJECT_SECRET_KEY" \
+            '.langfuse.public_key = $pk | .langfuse.secret_key = $sk' \
+            "$SECRETS_FILE")
+        echo "$UPDATED" > "$SECRETS_FILE"
+        echo -e "${GREEN}✓ Updated secrets.json with Langfuse project keys${NC}"
+    else
+        # Create minimal secrets.json with Langfuse keys
+        jq -n \
+            --arg pk "pk-lf-local-claude-code" \
+            --arg sk "$PROJECT_SECRET_KEY" \
+            '{"claude":{"credentials":{}},"langfuse":{"public_key":$pk,"secret_key":$sk},"api_keys":{"openai":"","google":""}}' \
+            > "$SECRETS_FILE"
+        echo -e "${GREEN}✓ Created secrets.json with Langfuse project keys${NC}"
+    fi
+    chmod 600 "$SECRETS_FILE"
+else
+    echo -e "${YELLOW}jq not available — please manually add Langfuse keys to secrets.json${NC}"
+    echo "  Public Key: pk-lf-local-claude-code"
+    echo "  Secret Key: $PROJECT_SECRET_KEY"
+fi
+echo ""
+
 echo "Next steps:"
 echo "  1. Start Langfuse: docker compose up -d"
 echo "  2. Install hook: ./scripts/install-hook.sh"
