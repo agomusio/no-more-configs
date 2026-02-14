@@ -33,10 +33,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. install-agent-config.sh runs multiple times without creating duplicates or failing
   6. GSD framework installs with 29 commands in ~/.claude/commands/gsd/ and 11 agents in ~/.claude/agents/
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 01-01: [To be planned]
+- [ ] 01-01-PLAN.md — Create config files (config.json, secrets.example.json, config.example.json) and agent-config/ directory with settings and MCP templates
+- [ ] 01-02-PLAN.md — Create install-agent-config.sh script and wire into devcontainer lifecycle
 
 ### Phase 2: Directory Dissolution
 **Goal**: claudehome/ directory eliminated with all contents redistributed to purpose-named locations, all path references use environment variables, and sessions can launch from any directory.
@@ -64,7 +65,7 @@ Plans:
 
 **Requirements**: AGT-03, AGT-04, AGT-05, CRD-01, CRD-02, CRD-03, CRD-04, GEN-01, GEN-02, GEN-03, GEN-04, GEN-05, GEN-06, CTR-01
 
-**⚠ Critical ordering:** The bind mount removal (CTR-01) is the riskiest single change. It MUST be:
+**Critical ordering:** The bind mount removal (CTR-01) is the riskiest single change. It MUST be:
 - The first commit in this phase (isolated, easy to revert)
 - Tested with a full container rebuild immediately after
 - Only then proceed to config generation and automation
@@ -86,10 +87,10 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Configuration Consolidation | 0/TBD | Not started | - |
+| 1. Configuration Consolidation | 0/2 | Planned | - |
 | 2. Directory Dissolution | 0/TBD | Not started | - |
 | 3. Runtime Generation & Cut-Over | 0/TBD | Not started | - |
