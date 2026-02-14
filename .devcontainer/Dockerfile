@@ -99,6 +99,10 @@ ENV SHELL=/bin/zsh
 ENV EDITOR=nano
 ENV VISUAL=nano
 
+# Workspace path references (used by scripts, aliases, and runtime config)
+ENV LANGFUSE_STACK_DIR=/workspace/infra
+ENV CLAUDE_WORKSPACE=/workspace
+
 # Default powerline10k theme
 ARG ZSH_IN_DOCKER_VERSION=1.2.0
 RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
@@ -118,6 +122,12 @@ ENV PATH="/home/node/.local/bin:${PATH}"
 # Skip permissions for Claude in WSL
 ENV CLAUDE_BYPASS_PERMISSIONS=true
 
+# Export workspace paths for interactive shells
+RUN echo "export LANGFUSE_STACK_DIR=/workspace/infra" >> /home/node/.bashrc && \
+    echo "export CLAUDE_WORKSPACE=/workspace" >> /home/node/.bashrc && \
+    echo "export LANGFUSE_STACK_DIR=/workspace/infra" >> /home/node/.zshrc && \
+    echo "export CLAUDE_WORKSPACE=/workspace" >> /home/node/.zshrc
+
 # Verify as the node user
 RUN claude --version
 
@@ -131,10 +141,10 @@ RUN sudo cp /tmp/mcp-setup-bin.sh /usr/local/bin/mcp-setup && \
     rm /tmp/mcp-setup-bin.sh
 
 # Add claudey/claudeyr aliases to both shell configs
-RUN echo "alias claudey='cd /workspace/claudehome && claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
-    echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
-    echo "alias claudey='cd /workspace/claudehome && claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
-    echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
+RUN echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
+    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
+    echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
+    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
 
 # Copy frequently changed infrastructure scripts later for better layer caching
 COPY --chown=node:node init-firewall.sh /tmp/init-firewall.sh
