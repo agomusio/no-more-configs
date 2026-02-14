@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 
 Phase: 3 of 3 (Claude Code Integration)
 Plan: 1 of 1 in current phase
-Status: Phase 3 complete
-Last activity: 2026-02-13 — Phase 3 Plan 1 complete, MCP auto-configuration deployed
+Status: Phase 3 verified — project complete
+Last activity: 2026-02-13 — Phase 3 verified (human), Dockerfile fix committed (heredoc extraction)
 
 Progress: [██████████] 100% (3/3 phases)
 
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 - Shell function over alias: Use shell functions for multi-line logic and heredoc support (mcp-setup)
 - postStartCommand auto-trigger: Run mcp-setup on every devcontainer start for zero manual setup
 - SERVERS.md co-location: Example server configs in companion file (JSON doesn't support comments)
+- **Dockerfile heredoc extraction:** Shell function extracted to mcp-setup.sh + mcp-setup-bin.sh (heredoc in RUN block caused parse error; /bin/sh postStartCommand can't source .bashrc)
+- **mcp-config-set flat keys:** Gateway config uses flat schema, not nested under server name
 
 ### Pending Todos
 
@@ -69,6 +71,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-13 (Phase 3 execution + completion)
-Stopped at: Phase 3 complete, all project objectives achieved
+Last session: 2026-02-13 (Phase 3 verified, Dockerfile fix applied)
+Stopped at: Project complete — all 3 phases delivered and verified
 Resume file: None
