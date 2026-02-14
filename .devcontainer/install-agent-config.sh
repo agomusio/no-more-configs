@@ -83,6 +83,30 @@ mkdir -p "$CLAUDE_DIR/hooks"
 mkdir -p "$CLAUDE_DIR/agents"
 mkdir -p "$CLAUDE_DIR/commands"
 
+# Copy skills from agent-config to runtime location (AGT-03)
+SKILLS_COUNT=0
+if [ -d "$AGENT_CONFIG_DIR/skills" ]; then
+    cp -r "$AGENT_CONFIG_DIR/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
+    SKILLS_COUNT=$(find "$AGENT_CONFIG_DIR/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
+    echo "[install] Copied $SKILLS_COUNT skill(s) to $CLAUDE_DIR/skills/"
+fi
+
+# Copy hooks from agent-config to runtime location (AGT-04)
+HOOKS_COUNT=0
+if [ -d "$AGENT_CONFIG_DIR/hooks" ]; then
+    cp "$AGENT_CONFIG_DIR/hooks/"* "$CLAUDE_DIR/hooks/" 2>/dev/null || true
+    HOOKS_COUNT=$(find "$AGENT_CONFIG_DIR/hooks" -maxdepth 1 -type f 2>/dev/null | wc -l)
+    echo "[install] Copied $HOOKS_COUNT hook(s) to $CLAUDE_DIR/hooks/"
+fi
+
+# Copy commands from agent-config, non-destructive — don't overwrite GSD (AGT-05)
+COMMANDS_COUNT=0
+if [ -d "$AGENT_CONFIG_DIR/commands" ]; then
+    cp -rn "$AGENT_CONFIG_DIR/commands/"* "$CLAUDE_DIR/commands/" 2>/dev/null || true
+    COMMANDS_COUNT=$(find "$AGENT_CONFIG_DIR/commands" -maxdepth 1 -mindepth 1 2>/dev/null | wc -l)
+    echo "[install] Copied $COMMANDS_COUNT command source(s) to $CLAUDE_DIR/commands/ (non-destructive)"
+fi
+
 # Generate settings.local.json from template
 if [ -f "$SETTINGS_TEMPLATE" ]; then
     sed -e "s|{{LANGFUSE_HOST}}|$LANGFUSE_HOST|g" \
@@ -146,6 +170,22 @@ else
     echo "[install] Generated .mcp.json with 1 server(s) (default)"
 fi
 
+# Detect unresolved {{PLACEHOLDER}} tokens in generated files (GEN-06)
+UNRESOLVED=""
+for generated_file in "$CLAUDE_DIR/settings.local.json" "$WORKSPACE_ROOT/.mcp.json"; do
+    if [ -f "$generated_file" ]; then
+        tokens=$(grep -oP '\{\{[A-Z_]+\}\}' "$generated_file" 2>/dev/null || true)
+        if [ -n "$tokens" ]; then
+            UNRESOLVED="$UNRESOLVED $tokens"
+            # Replace unresolved tokens with empty strings
+            sed -i 's/{{[A-Z_]*}}//g' "$generated_file"
+        fi
+    fi
+done
+if [ -n "$UNRESOLVED" ]; then
+    echo "[install] WARNING: Unresolved placeholders replaced with empty strings:$UNRESOLVED"
+fi
+
 # Install GSD framework
 if [ -d "$CLAUDE_DIR/commands/gsd" ] && [ "$(ls -A "$CLAUDE_DIR/commands/gsd" 2>/dev/null)" ]; then
     echo "[install] GSD: already installed, skipping"
@@ -172,6 +212,9 @@ echo "[install] Config: $CONFIG_STATUS"
 echo "[install] Secrets: $SECRETS_STATUS"
 echo "[install] Settings: generated"
 echo "[install] Credentials: $CREDS_STATUS"
+echo "[install] Skills: $SKILLS_COUNT skill(s)"
+echo "[install] Hooks: $HOOKS_COUNT hook(s)"
+echo "[install] Commands: $COMMANDS_COUNT command source(s)"
 echo "[install] MCP: $MCP_COUNT server(s)"
 echo "[install] GSD: $GSD_COMMANDS commands + $GSD_AGENTS agents"
 echo "[install] Done."
