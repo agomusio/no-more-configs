@@ -13,7 +13,7 @@ This refactor eliminates configuration scatter and host bind mount dependencies 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Configuration Consolidation** - Establish config foundation with secrets isolation
-- [ ] **Phase 2: Directory Dissolution** - Restructure directories and resolve path dependencies
+- [x] **Phase 2: Directory Dissolution** - Restructure directories and resolve path dependencies
 - [ ] **Phase 3: Runtime Generation & Cut-Over** - Remove bind mount (first, isolated), then implement full config automation
 
 ## Phase Details
@@ -56,8 +56,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Redistribute claudehome/ contents to new locations (agent-config/skills/, infra/) and update Dockerfile with env vars and clean aliases
-- [ ] 02-02-PLAN.md — Update path references in scripts and docs, then delete claudehome/ directory
+- [x] 02-01-PLAN.md — Redistribute claudehome/ contents to new locations (agent-config/skills/, infra/) and update Dockerfile with env vars and clean aliases
+- [x] 02-02-PLAN.md — Update path references in scripts and docs, then delete claudehome/ directory
 
 ### Phase 3: Runtime Generation & Cut-Over
 **Goal**: All runtime configs (firewall domains, VS Code settings, MCP gateway, agent settings) generated from templates, bind mount removed, validation catches errors pre-startup.
@@ -93,5 +93,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Configuration Consolidation | 2/2 | ✓ Complete | 2026-02-14 |
-| 2. Directory Dissolution | 0/2 | Not started | - |
+| 2. Directory Dissolution | 2/2 | ✓ Complete | 2026-02-14 |
 | 3. Runtime Generation & Cut-Over | 0/TBD | Not started | - |
