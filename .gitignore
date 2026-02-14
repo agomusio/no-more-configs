@@ -20,5 +20,12 @@ __pycache__/
 # Environment secrets
 .env
 
+# Sandbox secrets (credentials, API keys)
+secrets.json
+
 # Generated MCP config (created by mcp-setup on container start)
 .mcp.json
+
+# Temp prompts
+opus-refactor-prompt.md
+claude-auth-investigation.md

@@ -1,0 +1,19 @@
+{
+  "firewall": {
+    "extra_domains": ["adventure-alerts-api.sam-ed4.workers.dev"]
+  },
+  "langfuse": {
+    "host": "http://host.docker.internal:3052"
+  },
+  "agent": {
+    "defaults": {}
+  },
+  "vscode": {
+    "git_scan_paths": []
+  },
+  "mcp_servers": {
+    "mcp-gateway": {
+      "enabled": true
+    }
+  }
+}
