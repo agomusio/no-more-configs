@@ -8,13 +8,13 @@
 - The devcontainer reaches host-published services using `host.docker.internal`.
 
 ### Recommended MCP placement
-Add a new `docker-mcp-gateway` service to the **same compose project** as `langfuse-local/docker-compose.yml` so it:
+Add a new `docker-mcp-gateway` service to the **same compose project** as `infra/docker-compose.yml` so it:
 1. follows your existing sidecar model,
 2. remains isolated from the devcontainer filesystem/permissions model,
 3. can be reached from the devcontainer through a loopback-published port.
 
 ### Network and port-conflict analysis
-Existing host bindings in `langfuse-local/docker-compose.yml`:
+Existing host bindings in `infra/docker-compose.yml`:
 - `3030`, `3052`, `5433`, `6379`, `8124`, `9000`, `9090`, `9091`.
 
 To avoid collisions, reserve an MCP gateway port not currently used (example: `8811`) and bind to loopback only:
@@ -30,7 +30,7 @@ This keeps the endpoint private to host/devcontainer traffic and avoids LAN expo
 
 ## 2) Configuration Patches
 
-> Assumption: compose file is `claudehome/langfuse-local/docker-compose.yml`.
+> Assumption: compose file is `infra/docker-compose.yml`.
 
 ### Patch A — `docker-compose.yml` service addition
 
@@ -82,7 +82,7 @@ docker compose --profile mcp-docker-tools up -d docker-mcp-gateway
 
 ### Patch B — `mcp.json` for Filesystem MCP mapping
 
-Create `claudehome/langfuse-local/mcp/mcp.json`:
+Create `infra/mcp/mcp.json`:
 
 ```json
 {
@@ -115,7 +115,7 @@ Run these from inside your devcontainer shell (same as current workflow):
 
 ### Bring up gateway
 ```bash
-cd /workspace/claudehome/langfuse-local
+cd /workspace/infra
 mkdir -p mcp
 # ensure MCP_WORKSPACE_BIND resolves to daemon-visible source path
 export MCP_WORKSPACE_BIND=../..

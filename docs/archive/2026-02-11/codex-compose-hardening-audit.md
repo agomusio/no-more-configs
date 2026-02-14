@@ -1,7 +1,7 @@
 # Docker Compose Hardening Audit
 
 Date: 2026-02-11  
-Scope: `claudehome/langfuse-local/docker-compose.yml`
+Scope: `infra/docker-compose.yml`
 
 ## Key findings
 
@@ -108,8 +108,8 @@ cap_drop:
 
 ## Source references
 
-- `claudehome/langfuse-local/docker-compose.yml:2-168` (all services currently without resource caps)
-- `claudehome/langfuse-local/docker-compose.yml:4,51,70,91,111,125,145` (restart policy usage)
-- `claudehome/langfuse-local/docker-compose.yml:89-107` (MinIO entrypoint/healthcheck)
-- `claudehome/langfuse-local/docker-compose.yml:49-67` (langfuse-web currently no healthcheck)
-- `claudehome/langfuse-local/docker-compose.yml:2-48` (langfuse-worker currently no healthcheck)
+- `infra/docker-compose.yml:2-168` (all services currently without resource caps)
+- `infra/docker-compose.yml:4,51,70,91,111,125,145` (restart policy usage)
+- `infra/docker-compose.yml:89-107` (MinIO entrypoint/healthcheck)
+- `infra/docker-compose.yml:49-67` (langfuse-web currently no healthcheck)
+- `infra/docker-compose.yml:2-48` (langfuse-worker currently no healthcheck)

@@ -1,7 +1,7 @@
 # Langfuse Hook Robustness Review
 
 Date: 2026-02-11  
-Scope: Stop hook configured in `claudehome/.claude/settings.local.json` → `python3 /home/node/.claude/hooks/langfuse_hook.py` (repo source at `claudehome/langfuse-local/hooks/langfuse_hook.py`)
+Scope: Stop hook configured in `~/.claude/settings.json` → `python3 /home/node/.claude/hooks/langfuse_hook.py` (repo source at `infra/hooks/langfuse_hook.py`)
 
 ## Key findings
 
@@ -81,9 +81,9 @@ If `langfuse_state.json` is malformed:
 
 ## Source references
 
-- `claudehome/.claude/settings.local.json:14-18` (Stop hook command path)
-- `claudehome/langfuse-local/hooks/langfuse_hook.py:112-126` (state load/save without lock/atomic replace)
-- `claudehome/langfuse-local/hooks/langfuse_hook.py:215-258` (single latest transcript selection)
-- `claudehome/langfuse-local/hooks/langfuse_hook.py:405-412` (silent JSON parse skip)
-- `claudehome/langfuse-local/hooks/langfuse_hook.py:488-495` (single state checkpoint write)
-- `claudehome/langfuse-local/hooks/langfuse_hook.py:543-557` (top-level error handling/logging)
+- `~/.claude/settings.json` (Stop hook command path)
+- `infra/hooks/langfuse_hook.py:112-126` (state load/save without lock/atomic replace)
+- `infra/hooks/langfuse_hook.py:215-258` (single latest transcript selection)
+- `infra/hooks/langfuse_hook.py:405-412` (silent JSON parse skip)
+- `infra/hooks/langfuse_hook.py:488-495` (single state checkpoint write)
+- `infra/hooks/langfuse_hook.py:543-557` (top-level error handling/logging)
