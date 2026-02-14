@@ -11,27 +11,27 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 
 Phase: 1 of 3 (Configuration Consolidation)
 Plan: 2 of 2
-Status: In progress
-Last activity: 2026-02-14 — Completed 01-01-PLAN.md (configuration foundation)
+Status: Complete
+Last activity: 2026-02-14 — Completed 01-02-PLAN.md (install script creation)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 2 min
-- Total execution time: 0.03 hours
+- Total plans completed: 2
+- Average duration: 1.5 min
+- Total execution time: 0.05 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Configuration Consolidation | 1 | 2 min | 2 min |
+| 1. Configuration Consolidation | 2 | 3 min | 1.5 min |
 
 **Recent Trend:**
-- Last completed: 01-01 (2 min)
-- Trend: First plan completed
+- Last completed: 01-02 (1 min)
+- Trend: Phase 1 complete (2 plans, 3 min total)
 
 *Updated after each plan completion*
 
@@ -54,6 +54,12 @@ Recent decisions affecting current work:
 - Placeholder tokens use {{UPPER_SNAKE_CASE}} format for template hydration
 - Empty git_scan_paths array means auto-detect from gitprojects/ .git directories
 
+**From 01-02 execution:**
+- Natural idempotency (no state markers) — script uses mkdir -p, regenerates files, safe to run multiple times
+- Graceful degradation — script provides defaults when config.json missing, empty placeholders when secrets.json missing
+- JSON validation before processing — prevents cryptic jq errors from malformed files
+- Prefix all output with [install] — enables grep filtering in build logs
+
 ### Pending Todos
 
 None yet.
@@ -61,9 +67,9 @@ None yet.
 ### Blockers/Concerns
 
 **Phase 1 (Configuration Consolidation):**
-- Credential persistence critical — must implement secrets.json + save-secrets helper BEFORE removing ~/.claude bind mount
-- GSD framework compatibility — need to verify ~/.claude/commands/ and ~/.claude/agents/ directories work with container-local paths
-- Idempotency markers — scripts must use state markers (~/.local/state/gsd-initialized) to prevent duplicate installations
+- RESOLVED: Credential persistence — secrets.json schema implemented, install script restores credentials
+- RESOLVED: GSD framework compatibility — install script installs to ~/.claude/commands/ and ~/.claude/agents/
+- RESOLVED: Idempotency markers — used natural idempotency (mkdir -p, regeneration) instead of state markers
 
 **Phase 2 (Directory Dissolution):**
 - Commit ordering — must use add-wire-delete sequence to keep container buildable at every commit
@@ -78,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-14 (plan execution)
-Stopped at: Completed 01-01-PLAN.md
+Stopped at: Completed 01-02-PLAN.md (Phase 1 complete)
 Resume file: None
