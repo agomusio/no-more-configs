@@ -8,7 +8,6 @@ echo ">>> Starting Firewall Configuration..."
 
 CACHE_DIR="/var/cache/devcontainer-firewall"
 GH_CACHE_FILE="$CACHE_DIR/github-meta.json"
-DNS_CACHE_FILE="$CACHE_DIR/dns-resolved.txt"
 CACHE_MAX_AGE=86400  # 24 hours
 
 # Detect Host IP (WSL Gateway)
@@ -63,14 +62,11 @@ iptables -A INPUT -p udp --sport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
 iptables -A INPUT -p tcp --sport 53 -j ACCEPT
 
-# --- 4. HOST & DOCKER CONNECTIVITY (The Fix) ---
+# --- 4. HOST & DOCKER CONNECTIVITY ---
 
-# 1. Allow Traffic to the Default Gateway (Routing)
 iptables -A OUTPUT -d "$HOST_IP" -j ACCEPT
 iptables -A INPUT -s "$HOST_IP" -j ACCEPT
 
-# 2. RESOLVE AND ALLOW "host.docker.internal" (The Magic IP)
-# This is critical for Docker Desktop/WSL where the internal host IP differs from the gateway
 echo "Resolving host.docker.internal..."
 MAGIC_IP=$(dig +short host.docker.internal | tail -n1)
 
@@ -80,22 +76,18 @@ if [ -n "$MAGIC_IP" ]; then
     iptables -A INPUT -s "$MAGIC_IP" -j ACCEPT
 else
     echo "  > WARNING: Could not resolve host.docker.internal. Langfuse might fail."
-    # Fallback: Allow the common Docker Desktop magic subnet just in case
     iptables -A OUTPUT -d 192.168.65.0/24 -j ACCEPT
     iptables -A INPUT -s 192.168.65.0/24 -j ACCEPT
 fi
 
-# 3. Allow Docker Bridge Subnet (Sibling containers)
 iptables -A OUTPUT -d 172.16.0.0/12 -j ACCEPT
 iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT
 
-# 4. Allow the Host Network (WSL integration)
 iptables -A INPUT -s "$HOST_NETWORK" -j ACCEPT
 iptables -A OUTPUT -d "$HOST_NETWORK" -j ACCEPT
 
 # --- 5. STATEFUL TRACKING ---
 
-# Allow Established/Related connections (CRITICAL for return traffic)
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
@@ -104,8 +96,6 @@ iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 ipset create allowed-domains hash:net
 
 mkdir -p "$CACHE_DIR"
-
-# --- 6a. GitHub IP Ranges (cached with TTL) ---
 
 cache_is_fresh() {
     [ -s "$GH_CACHE_FILE" ] && \
@@ -137,60 +127,16 @@ echo "$gh_ranges" | jq -r '(.web + .api + .git)[]' | aggregate -q | while read -
     ipset add allowed-domains "$cidr" -exist
 done
 
-# --- 6b. Domain DNS Resolution (parallel) ---
+# NOTE: DNS-resolved IPs for CDN-backed domains can go stale after startup.
+# A periodic refresh script is installed at /usr/local/bin/refresh-firewall-dns.sh.
+# To refresh manually without restarting the container:
+#   sudo /usr/local/bin/refresh-firewall-dns.sh
+sudo /usr/local/bin/refresh-firewall-dns.sh
 
-DOMAINS=(
-    "registry.npmjs.org"
-    "registry.npmjs.com"
-    "api.anthropic.com"
-    "sentry.io"
-    "statsig.anthropic.com"
-    "statsig.com"
-    "marketplace.visualstudio.com"
-    "gallerycdn.vsassets.io"
-    "gallery.vsassets.io"
-    "vsassets.io"
-    "vscode.blob.core.windows.net"
-    "deb.debian.org"
-    "security.debian.org"
-    "github.com"
-    "objects.githubusercontent.com"
-    "uploads.github.com"
-    "codeload.github.com"
-    "api.cloudflare.com"
-    "dash.cloudflare.com"
-    "workers.dev"
-    "update.code.visualstudio.com"
-    "storage.googleapis.com"
-    "pypi.python.org"
-    "pypi.org"
-    "files.pythonhosted.org"
-    "json.schemastore.org"
-    "adventure-alerts-api.sam-ed4.workers.dev"
-)
-
-resolve_domain() {
-    local domain="$1"
-    dig +noall +answer A "$domain" 2>/dev/null | awk '$4 == "A" {print $5}'
-}
-export -f resolve_domain
-
-echo "Resolving ${#DOMAINS[@]} domains in parallel..."
-RESOLVED_IPS=$(printf '%s\n' "${DOMAINS[@]}" | xargs -P 8 -I{} bash -c 'resolve_domain "$@"' _ {} | sort -u)
-
-echo "  Resolved $(echo "$RESOLVED_IPS" | wc -l) unique IPs"
-while read -r ip; do
-    if [[ -n "$ip" && "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        ipset add allowed-domains "$ip" -exist
-    fi
-done <<< "$RESOLVED_IPS"
-
-# Apply the Allow List
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
 
 # --- 7. LOCKDOWN & VERIFY ---
 
-# Set Default Policies to DROP
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT DROP
@@ -198,9 +144,19 @@ iptables -P OUTPUT DROP
 # Reject anything else with ICMP error (faster debugging than silent DROP)
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
+echo "Locking down IPv6..."
+ip6tables -F 2>/dev/null || true
+ip6tables -X 2>/dev/null || true
+ip6tables -P INPUT DROP 2>/dev/null || true
+ip6tables -P FORWARD DROP 2>/dev/null || true
+ip6tables -P OUTPUT DROP 2>/dev/null || true
+ip6tables -A INPUT -i lo -j ACCEPT 2>/dev/null || true
+ip6tables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+ip6tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+ip6tables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+
 echo ">>> Firewall Configured. Verifying..."
 
-# Verification: Should Fail
 if curl --connect-timeout 2 --max-time 5 https://example.com >/dev/null 2>&1; then
     echo "ERROR: Firewall failed - reached https://example.com"
     exit 1
@@ -208,7 +164,6 @@ else
     echo "Success: Blocked https://example.com"
 fi
 
-# Verification: Should Pass
 if ! curl --connect-timeout 5 --max-time 10 https://api.github.com/zen >/dev/null 2>&1; then
     echo "ERROR: Firewall failed - blocked https://api.github.com"
     exit 1
