@@ -53,16 +53,18 @@ If you open the folder locally first, VS Code will detect `.devcontainer/devcont
 
 On first build, the `postCreateCommand` runs `.devcontainer/setup-container.sh`, which:
 
-- Whitelists all git directories (`git config --global --add safe.directory '*'`)
-- Sets line endings for WSL compatibility (`core.autocrlf input`)
 - Grants Docker socket access (`chmod 666 /var/run/docker.sock`)
-- Installs the Langfuse Python SDK (`python3 -m pip install langfuse --break-system-packages`)
-- Verifies connectivity to `host.docker.internal`
-- Health-checks the Langfuse API on port 3052
+- Applies git identity from host-provided env vars (`GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`)
 
-It then runs `.devcontainer/init-gsd.sh`, which installs the [GSD (Get Shit Done)](https://github.com/glittercowboy/get-shit-done) slash commands into `~/.claude/commands/gsd/` if not already present.
+On every start (including rebuilds), `postStartCommand` now runs in this order:
 
-On every start (including rebuilds), `postStartCommand` also runs `mcp-setup`, which generates `/workspace/.mcp.json` pointing to the MCP gateway. No manual MCP configuration is needed.
+1. `init-firewall.sh`
+2. Git trust + line ending config (`safe.directory`, `core.autocrlf`)
+3. `.devcontainer/setup-network-checks.sh` (Langfuse pip install + host/Langfuse reachability checks)
+4. `.devcontainer/init-gsd.sh` (installs GSD slash commands if missing)
+5. `mcp-setup` (regenerates `/workspace/.mcp.json` and health-checks MCP gateway)
+
+This ordering avoids first-create race conditions where network checks run before firewall rules are active.
 
 ### 2. Start the Langfuse Stack
 
@@ -143,7 +145,7 @@ See `/gsd:help` for the full command list.
 
 ## Shell Shortcuts
 
-Defined as functions in `~/.zshrc`:
+Defined as shell commands available on `PATH` (plus aliases for Claude launchers):
 
 | Command     | Action                                                                       |
 | ----------- | ---------------------------------------------------------------------------- |
@@ -255,6 +257,19 @@ Example configurations for GitHub, PostgreSQL, and Brave Search are in [`langfus
    ```
 4. Re-run `mcp-setup` (regenerates `.mcp.json` and health-checks)
 5. Restart Claude Code session
+
+---
+
+
+## Firewall & Docker Socket Security Notes
+
+- The firewall is IPv4+IPv6 default-deny and allowlist-based, with domain names resolved to IPs at runtime.
+- CDN-backed domains can rotate IPs; to refresh domain IPs without restarting the container run:
+  ```bash
+  sudo /usr/local/bin/refresh-firewall-dns.sh
+  ```
+- Project-specific firewall domains are configured in `.devcontainer/firewall-domains.conf`.
+- `setup-container.sh` uses `chmod 666 /var/run/docker.sock` for Docker-outside-of-Docker convenience. This grants any process in the dev container full control of the host Docker daemon; treat the container as highly privileged.
 
 ---
 

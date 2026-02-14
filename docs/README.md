@@ -32,3 +32,12 @@ Completed audits and specs, organized by date.
 | File                                                                                | Codex Version | Description                                               |
 | ----------------------------------------------------------------------------------- | ------------- | --------------------------------------------------------- |
 | [`codex-mcp-integration-spec.md`](archive/2026-02-10/codex-mcp-integration-spec.md) | 5.3           | MCP gateway integration RFC (implemented in phases 01-02) |
+
+
+### 2026-02-14
+
+| File | Codex Version | Description |
+| ---- | ------------- | ----------- |
+| [`devcontainer-review.md`](devcontainer-review.md) | 5.2 | Full `.devcontainer/` review with applied fixes for lifecycle, firewall, reproducibility, and maintainability issues |
+| [`devcontainer-followup-validation.md`](devcontainer-followup-validation.md) | 5.2 | Follow-up validation notes responding to review feedback and documenting intentional `latest` Claude CLI policy |
+

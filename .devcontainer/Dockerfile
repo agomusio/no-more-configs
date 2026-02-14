@@ -3,6 +3,7 @@ FROM node:20
 ARG TZ
 ENV TZ="$TZ"
 
+# Intentionally use latest Claude Code on each build for fast access to updates.
 ARG CLAUDE_CODE_VERSION=latest
 
 # Install basic development tools and iptables/ipset
@@ -71,13 +72,10 @@ WORKDIR /workspace
 
 ARG GIT_DELTA_VERSION=0.18.2
 RUN ARCH=$(dpkg --print-architecture) && \
-  wget "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
+  curl -fsSL -o "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" \
+    "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
-
-# Copy and set up firewall script
-COPY init-firewall.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/init-firewall.sh
 
 # GIVE 'node' FULL SUDO ACCESS
 # This allows Claude Code to run the firewall script AND use tar/zstd
@@ -103,7 +101,7 @@ ENV VISUAL=nano
 
 # Default powerline10k theme
 ARG ZSH_IN_DOCKER_VERSION=1.2.0
-RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
+RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
   -p git \
   -p fzf \
   -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
@@ -126,20 +124,23 @@ RUN claude --version
 # Install GSD (Get Shit Done) framework for Claude Code
 RUN npm install -g get-shit-done-cc
 
-# Install mcp-setup as a standalone script on PATH (so postStartCommand can call it via /bin/sh)
+# Install mcp-setup as a standalone script on PATH
 COPY --chown=node:node mcp-setup-bin.sh /tmp/mcp-setup-bin.sh
 RUN sudo cp /tmp/mcp-setup-bin.sh /usr/local/bin/mcp-setup && \
     sudo chmod +x /usr/local/bin/mcp-setup && \
     rm /tmp/mcp-setup-bin.sh
 
-# Copy the mcp-setup shell function for interactive shells
-COPY --chown=node:node mcp-setup.sh /tmp/mcp-setup-func.sh
-
-# Add claudey/claudeyr aliases and mcp-setup function to both shell configs
+# Add claudey/claudeyr aliases to both shell configs
 RUN echo "alias claudey='cd /workspace/claudehome && claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
     echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
     echo "alias claudey='cd /workspace/claudehome && claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
-    echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc && \
-    cat /tmp/mcp-setup-func.sh >> /home/node/.bashrc && \
-    cat /tmp/mcp-setup-func.sh >> /home/node/.zshrc && \
-    rm /tmp/mcp-setup-func.sh
+    echo "alias claudeyr='cd /workspace/claudehome && claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
+
+# Copy frequently changed infrastructure scripts later for better layer caching
+COPY --chown=node:node init-firewall.sh /tmp/init-firewall.sh
+COPY --chown=node:node refresh-firewall-dns.sh /tmp/refresh-firewall-dns.sh
+RUN sudo cp /tmp/init-firewall.sh /usr/local/bin/init-firewall.sh && \
+    sudo chmod +x /usr/local/bin/init-firewall.sh && \
+    sudo cp /tmp/refresh-firewall-dns.sh /usr/local/bin/refresh-firewall-dns.sh && \
+    sudo chmod +x /usr/local/bin/refresh-firewall-dns.sh && \
+    rm /tmp/init-firewall.sh /tmp/refresh-firewall-dns.sh
