@@ -1,0 +1,15 @@
+aa-cloudflare
+Copyright 2025 Adventure Alerts contributors
+
+This skill is a derivative work based on cloudflare-deploy, originally
+created by OpenAI and licensed under the Apache License, Version 2.0.
+
+Original work: cloudflare-deploy by OpenAI
+Source: https://github.com/anthropics/awesome-claude-skills
+
+Modifications by Adventure Alerts contributors:
+- Added "Common Integration Patterns" section covering Hono + Workers,
+  Drizzle ORM + D1, Durable Objects alarm scheduling, and monorepo
+  deployment patterns
+- Updated description and metadata to reflect fork identity
+- All original product references and decision trees retained unmodified
