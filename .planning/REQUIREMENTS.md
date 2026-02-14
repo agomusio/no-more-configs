@@ -105,52 +105,57 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | — | Pending |
-| CFG-02 | — | Pending |
-| CFG-03 | — | Pending |
-| CFG-04 | — | Pending |
-| CFG-05 | — | Pending |
-| AGT-01 | — | Pending |
-| AGT-02 | — | Pending |
-| AGT-03 | — | Pending |
-| AGT-04 | — | Pending |
-| AGT-05 | — | Pending |
-| AGT-06 | — | Pending |
-| AGT-07 | — | Pending |
-| INS-01 | — | Pending |
-| INS-02 | — | Pending |
-| INS-03 | — | Pending |
-| INS-04 | — | Pending |
-| INS-05 | — | Pending |
-| INS-06 | — | Pending |
-| DIR-01 | — | Pending |
-| DIR-02 | — | Pending |
-| DIR-03 | — | Pending |
-| DIR-04 | — | Pending |
-| DIR-05 | — | Pending |
-| DIR-06 | — | Pending |
-| DIR-07 | — | Pending |
-| DIR-08 | — | Pending |
-| CTR-01 | — | Pending |
-| CTR-02 | — | Pending |
-| CTR-03 | — | Pending |
-| CTR-04 | — | Pending |
-| CRD-01 | — | Pending |
-| CRD-02 | — | Pending |
-| CRD-03 | — | Pending |
-| CRD-04 | — | Pending |
-| GEN-01 | — | Pending |
-| GEN-02 | — | Pending |
-| GEN-03 | — | Pending |
-| GEN-04 | — | Pending |
-| GEN-05 | — | Pending |
-| GEN-06 | — | Pending |
+| CFG-01 | Phase 1 | Pending |
+| CFG-02 | Phase 1 | Pending |
+| CFG-03 | Phase 1 | Pending |
+| CFG-04 | Phase 1 | Pending |
+| CFG-05 | Phase 1 | Pending |
+| AGT-01 | Phase 1 | Pending |
+| AGT-02 | Phase 1 | Pending |
+| AGT-03 | Phase 3 | Pending |
+| AGT-04 | Phase 3 | Pending |
+| AGT-05 | Phase 3 | Pending |
+| AGT-06 | Phase 1 | Pending |
+| AGT-07 | Phase 1 | Pending |
+| INS-01 | Phase 1 | Pending |
+| INS-02 | Phase 1 | Pending |
+| INS-03 | Phase 1 | Pending |
+| INS-04 | Phase 1 | Pending |
+| INS-05 | Phase 1 | Pending |
+| INS-06 | Phase 1 | Pending |
+| DIR-01 | Phase 2 | Pending |
+| DIR-02 | Phase 2 | Pending |
+| DIR-03 | Phase 2 | Pending |
+| DIR-04 | Phase 2 | Pending |
+| DIR-05 | Phase 2 | Pending |
+| DIR-06 | Phase 2 | Pending |
+| DIR-07 | Phase 2 | Pending |
+| DIR-08 | Phase 2 | Pending |
+| CTR-01 | Phase 3 | Pending |
+| CTR-02 | Phase 2 | Pending |
+| CTR-03 | Phase 2 | Pending |
+| CTR-04 | Phase 2 | Pending |
+| CRD-01 | Phase 3 | Pending |
+| CRD-02 | Phase 3 | Pending |
+| CRD-03 | Phase 3 | Pending |
+| CRD-04 | Phase 3 | Pending |
+| GEN-01 | Phase 3 | Pending |
+| GEN-02 | Phase 3 | Pending |
+| GEN-03 | Phase 3 | Pending |
+| GEN-04 | Phase 3 | Pending |
+| GEN-05 | Phase 3 | Pending |
+| GEN-06 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 40 total
-- Mapped to phases: 0
-- Unmapped: 40 (pending roadmap creation)
+- Mapped to phases: 40
+- Unmapped: 0
+
+**Phase distribution:**
+- Phase 1 (Configuration Consolidation): 15 requirements
+- Phase 2 (Directory Dissolution): 11 requirements
+- Phase 3 (Runtime Generation): 14 requirements
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-14 after initial definition*
+*Last updated: 2026-02-14 after roadmap creation*
