@@ -58,10 +58,10 @@ Plans:
   2. Claude Code configuration (.mcp.json or settings.local.json) contains gateway URL and auto-connects on start
   3. Adding a second MCP server to mcp.json and restarting gateway makes it available to Claude Code
   4. Documentation exists for adding new MCP servers (config edit + restart workflow)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 03-01: TBD during planning
+- [ ] 03-01-PLAN.md — Add mcp-setup shell function, MCP_GATEWAY_URL env var, and example server documentation
 
 ## Progress
 
@@ -72,8 +72,8 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Gateway Infrastructure | 1/1 | ✓ Complete | 2026-02-10 |
 | 2. Connectivity & Health Validation | 1/1 | ✓ Complete | 2026-02-10 |
-| 3. Claude Code Integration | 0/TBD | Not started | - |
+| 3. Claude Code Integration | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-10*
-*Last updated: 2026-02-10 — Phase 2 complete*
+*Last updated: 2026-02-13 — Phase 3 planned*
