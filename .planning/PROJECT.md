@@ -52,6 +52,7 @@ All container configuration is generated from source files checked into the repo
 - Infrastructure stack: Langfuse (tracing), MCP gateway, Postgres, ClickHouse, Redis, MinIO
 - All work is executed from the Windows host side (not from inside the container being modified)
 - A research phase will investigate Codex CLI and Gemini CLI tooling to inform the v2 multi-model milestone
+- Claude Code plugins (public beta) are a separate extension system — plugins bundle skills, hooks, agents, and MCP servers in directories with `.claude-plugin/plugin.json` manifests. They coexist with standalone `.claude/` config (our approach). Plugin MCP servers load from the plugin directory's own `.mcp.json`, independent of the workspace-level `.mcp.json` our install script generates. Three considerations for later phases: (1) plugin MCP servers connecting to external services need those domains in the firewall whitelist, (2) plugin MCP servers using stdio need their binaries available in the container (Dockerfile), (3) plugins installed at runtime need a persistence strategy across container rebuilds (e.g., install in postCreateCommand or store plugin dirs in version control)
 
 ## Constraints
 
