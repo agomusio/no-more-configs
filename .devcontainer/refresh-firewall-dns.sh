@@ -6,44 +6,20 @@ if ! ipset list allowed-domains >/dev/null 2>&1; then
   exit 1
 fi
 
-DOMAINS=(
-  "registry.npmjs.org"
-  "registry.npmjs.com"
-  "api.anthropic.com"
-  "sentry.io"
-  "statsig.anthropic.com"
-  "statsig.com"
-  "marketplace.visualstudio.com"
-  "gallerycdn.vsassets.io"
-  "gallery.vsassets.io"
-  "vsassets.io"
-  "vscode.blob.core.windows.net"
-  "deb.debian.org"
-  "security.debian.org"
-  "github.com"
-  "objects.githubusercontent.com"
-  "uploads.github.com"
-  "codeload.github.com"
-  "api.cloudflare.com"
-  "dash.cloudflare.com"
-  "workers.dev"
-  "update.code.visualstudio.com"
-  "storage.googleapis.com"
-  "pypi.python.org"
-  "pypi.org"
-  "files.pythonhosted.org"
-  "json.schemastore.org"
-)
+DOMAINS_FILE="/workspace/.devcontainer/firewall-domains.conf"
+if [ ! -f "$DOMAINS_FILE" ]; then
+    echo "ERROR: $DOMAINS_FILE not found. Run install-agent-config.sh first."
+    exit 1
+fi
 
-EXTRA_DOMAINS_FILE="/workspace/.devcontainer/firewall-domains.conf"
-if [ -f "$EXTRA_DOMAINS_FILE" ]; then
-  while IFS= read -r domain; do
+DOMAINS=()
+while IFS= read -r domain; do
+    # Skip empty lines and comments
     if [ -z "$domain" ] || [[ "$domain" =~ ^[[:space:]]*# ]]; then
-      continue
+        continue
     fi
     DOMAINS+=("$domain")
-  done < "$EXTRA_DOMAINS_FILE"
-fi
+done < "$DOMAINS_FILE"
 
 resolve_domain() {
   local domain="$1"
