@@ -12,7 +12,7 @@ This refactor eliminates configuration scatter and host bind mount dependencies 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Configuration Consolidation** - Establish config foundation with secrets isolation
+- [x] **Phase 1: Configuration Consolidation** - Establish config foundation with secrets isolation
 - [ ] **Phase 2: Directory Dissolution** - Restructure directories and resolve path dependencies
 - [ ] **Phase 3: Runtime Generation & Cut-Over** - Remove bind mount (first, isolated), then implement full config automation
 
@@ -36,8 +36,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Create config files (config.json, secrets.example.json, config.example.json) and agent-config/ directory with settings and MCP templates
-- [ ] 01-02-PLAN.md — Create install-agent-config.sh script and wire into devcontainer lifecycle
+- [x] 01-01-PLAN.md — Create config files (config.json, secrets.example.json, config.example.json) and agent-config/ directory with settings and MCP templates
+- [x] 01-02-PLAN.md — Create install-agent-config.sh script and wire into devcontainer lifecycle
 
 ### Phase 2: Directory Dissolution
 **Goal**: claudehome/ directory eliminated with all contents redistributed to purpose-named locations, all path references use environment variables, and sessions can launch from any directory.
@@ -91,6 +91,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Configuration Consolidation | 0/2 | Planned | - |
+| 1. Configuration Consolidation | 2/2 | ✓ Complete (human verification pending) | 2026-02-14 |
 | 2. Directory Dissolution | 0/TBD | Not started | - |
 | 3. Runtime Generation & Cut-Over | 0/TBD | Not started | - |
