@@ -27,11 +27,11 @@ if [ "$http_code" = "200" ]; then
   echo "✓ Gateway is healthy"
 else
   echo "⚠ Warning: Gateway not ready (HTTP ${http_code})"
-  echo "  Start: cd /workspace/claudehome/langfuse-local && docker compose up -d docker-mcp-gateway"
+  echo "  Start: cd ${LANGFUSE_STACK_DIR:-/workspace/infra} && docker compose up -d docker-mcp-gateway"
 fi
 
 echo ""
 echo "Config: /workspace/.mcp.json"
 echo "Gateway: ${gateway_url}"
 echo "Next: Restart Claude Code session to pick up MCP tools"
-echo "To add servers: Edit langfuse-local/mcp/mcp.json, restart gateway, then re-run mcp-setup"
+echo "To add servers: Edit ${LANGFUSE_STACK_DIR:-/workspace/infra}/mcp/mcp.json, restart gateway, then re-run mcp-setup"

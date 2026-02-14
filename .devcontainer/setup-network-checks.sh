@@ -14,5 +14,5 @@ if curl -s -o /dev/null -w "%{http_code}" http://host.docker.internal:3052/api/p
     echo "✅ Langfuse is reachable."
 else
     echo "❌ ERROR: Langfuse unreachable on 3052."
-    echo "👉 Run: cd /workspace/claudehome/langfuse-local && sudo docker compose up -d"
+    echo "👉 Run: cd ${LANGFUSE_STACK_DIR:-/workspace/infra} && sudo docker compose up -d"
 fi
