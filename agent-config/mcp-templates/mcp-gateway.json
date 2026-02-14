@@ -1,0 +1,6 @@
+{
+  "mcp-gateway": {
+    "type": "sse",
+    "url": "{{MCP_GATEWAY_URL}}/sse"
+  }
+}
