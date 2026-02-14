@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Claude Code sessions in this devcontainer have seamless access to MCP servers without manual setup — any supported MCP server can be plugged in through a single gateway.
-**Current focus:** Phase 2 - Connectivity & Health Validation
+**Current focus:** Phase 3 - Claude Code Integration
 
 ## Current Position
 
-Phase: 2 of 3 (Connectivity & Health Validation)
+Phase: 3 of 3 (Claude Code Integration)
 Plan: 1 of 1 in current phase
-Status: Phase 2 complete
-Last activity: 2026-02-11 — Phase 2 Plan 1 complete, gateway validated
+Status: Phase 3 complete
+Last activity: 2026-02-13 — Phase 3 Plan 1 complete, MCP auto-configuration deployed
 
-Progress: [██████░░░░] 66% (2/3 phases)
+Progress: [██████████] 100% (3/3 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 6 min
-- Total execution time: 0.20 hours
+- Total plans completed: 3
+- Average duration: 5 min
+- Total execution time: 0.23 hours
 
 **By Phase:**
 
@@ -29,11 +29,13 @@ Progress: [██████░░░░] 66% (2/3 phases)
 |-------|-------|-------|----------|
 | 01-gateway-infrastructure | 1 | 2 min | 2 min |
 | 02-connectivity-health-validation | 1 | 10 min | 10 min |
+| 03-claude-code-integration | 1 | 2 min | 2 min |
 
 **Recent Plans:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 03-claude-code-integration | 01 | 2 min | 2 | 3 |
 | 02-connectivity-health-validation | 01 | 10 min | 2 | 2 |
 | 01-gateway-infrastructure | 01 | 2 min | 2 | 3 |
 
@@ -53,6 +55,9 @@ Recent decisions affecting current work:
 - **SSE transport mode:** Gateway requires explicit --transport sse --port 8811 to run HTTP server (defaults to stdio mode)
 - Health check timing: 20s start_period allows npx download on first run
 - **Volume alignment:** MCP_WORKSPACE_BIND must match devcontainer workspaceMount source (environment-specific configuration)
+- Shell function over alias: Use shell functions for multi-line logic and heredoc support (mcp-setup)
+- postStartCommand auto-trigger: Run mcp-setup on every devcontainer start for zero manual setup
+- SERVERS.md co-location: Example server configs in companion file (JSON doesn't support comments)
 
 ### Pending Todos
 
@@ -64,6 +69,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 2 execution + validation)
-Stopped at: Phase 2 complete, gateway validated and reachable
+Last session: 2026-02-13 (Phase 3 execution + completion)
+Stopped at: Phase 3 complete, all project objectives achieved
 Resume file: None
