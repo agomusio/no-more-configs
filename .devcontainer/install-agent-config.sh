@@ -1,0 +1,177 @@
+#!/bin/bash
+set -euo pipefail
+
+# install-agent-config.sh
+# Reads config.json and secrets.json, hydrates templates, installs GSD framework,
+# restores credentials, and prints a summary.
+# Safe to run multiple times (naturally idempotent).
+
+# Constants and paths
+WORKSPACE_ROOT="/workspace"
+CONFIG_FILE="$WORKSPACE_ROOT/config.json"
+SECRETS_FILE="$WORKSPACE_ROOT/secrets.json"
+AGENT_CONFIG_DIR="$WORKSPACE_ROOT/agent-config"
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-/home/node/.claude}"
+SETTINGS_TEMPLATE="$AGENT_CONFIG_DIR/settings.json.template"
+MCP_TEMPLATES_DIR="$AGENT_CONFIG_DIR/mcp-templates"
+
+# JSON validation helper
+validate_json() {
+    local file="$1"
+    local label="$2"
+    if ! jq empty < "$file" &>/dev/null; then
+        echo "[install] ERROR: $label is not valid JSON — skipping"
+        return 1
+    fi
+    return 0
+}
+
+# Initialize counters for summary
+CONFIG_STATUS="defaults — config.json not found"
+SECRETS_STATUS="empty placeholders — secrets.json not found"
+CREDS_STATUS="missing — manual login required"
+MCP_COUNT=0
+GSD_COMMANDS=0
+GSD_AGENTS=0
+
+# Load config.json (or use defaults)
+if [ -f "$CONFIG_FILE" ]; then
+    if validate_json "$CONFIG_FILE" "config.json"; then
+        CONFIG_STATUS="loaded"
+        LANGFUSE_HOST=$(jq -r '.langfuse.host // "http://host.docker.internal:3052"' "$CONFIG_FILE")
+        EXTRA_DOMAINS=$(jq -r '.firewall.extra_domains // [] | join(" ")' "$CONFIG_FILE")
+    else
+        LANGFUSE_HOST="http://host.docker.internal:3052"
+        EXTRA_DOMAINS=""
+    fi
+else
+    echo "[install] config.json not found — using defaults"
+    LANGFUSE_HOST="http://host.docker.internal:3052"
+    EXTRA_DOMAINS=""
+fi
+
+# Load secrets.json (or use empty placeholders)
+if [ -f "$SECRETS_FILE" ]; then
+    if validate_json "$SECRETS_FILE" "secrets.json"; then
+        SECRETS_STATUS="loaded"
+        LANGFUSE_PUBLIC_KEY=$(jq -r '.langfuse.public_key // ""' "$SECRETS_FILE")
+        LANGFUSE_SECRET_KEY=$(jq -r '.langfuse.secret_key // ""' "$SECRETS_FILE")
+
+        # Check for missing individual secrets
+        if [ -z "$LANGFUSE_PUBLIC_KEY" ]; then
+            echo "[install] secrets.json: langfuse.public_key missing — tracing will not work"
+        fi
+        if [ -z "$LANGFUSE_SECRET_KEY" ]; then
+            echo "[install] secrets.json: langfuse.secret_key missing — tracing will not work"
+        fi
+    else
+        LANGFUSE_PUBLIC_KEY=""
+        LANGFUSE_SECRET_KEY=""
+    fi
+else
+    echo "[install] secrets.json not found — using empty placeholders"
+    LANGFUSE_PUBLIC_KEY=""
+    LANGFUSE_SECRET_KEY=""
+fi
+
+# Get MCP Gateway URL from environment or default
+MCP_GATEWAY_URL="${MCP_GATEWAY_URL:-http://host.docker.internal:8811}"
+
+# Create directories (idempotent)
+mkdir -p "$CLAUDE_DIR/skills"
+mkdir -p "$CLAUDE_DIR/hooks"
+mkdir -p "$CLAUDE_DIR/agents"
+mkdir -p "$CLAUDE_DIR/commands"
+
+# Generate settings.local.json from template
+if [ -f "$SETTINGS_TEMPLATE" ]; then
+    sed -e "s|{{LANGFUSE_HOST}}|$LANGFUSE_HOST|g" \
+        -e "s|{{LANGFUSE_PUBLIC_KEY}}|$LANGFUSE_PUBLIC_KEY|g" \
+        -e "s|{{LANGFUSE_SECRET_KEY}}|$LANGFUSE_SECRET_KEY|g" \
+        "$SETTINGS_TEMPLATE" > "$CLAUDE_DIR/settings.local.json"
+    echo "[install] Generated settings.local.json"
+else
+    echo "[install] WARNING: settings.json.template not found — skipping settings generation"
+fi
+
+# Restore Claude credentials (if available)
+if [ -f "$SECRETS_FILE" ]; then
+    CLAUDE_CREDS=$(jq -e '.claude.credentials // {}' "$SECRETS_FILE" 2>/dev/null || echo "{}")
+    # Check if credentials object is non-empty
+    if [ "$CLAUDE_CREDS" != "{}" ] && [ "$CLAUDE_CREDS" != "null" ]; then
+        echo "$CLAUDE_CREDS" > "$CLAUDE_DIR/.credentials.json"
+        chmod 600 "$CLAUDE_DIR/.credentials.json"
+        CREDS_STATUS="restored"
+        echo "[install] Claude credentials restored"
+    else
+        echo "[install] Claude credentials not found — manual login required after first start"
+    fi
+else
+    echo "[install] Claude credentials not found — manual login required after first start"
+fi
+
+# Generate .mcp.json from enabled MCP templates
+if [ -f "$CONFIG_FILE" ]; then
+    # Get list of enabled MCP servers
+    ENABLED_SERVERS=$(jq -r '.mcp_servers | to_entries[] | select(.value.enabled == true) | .key' "$CONFIG_FILE" 2>/dev/null || echo "")
+
+    if [ -n "$ENABLED_SERVERS" ]; then
+        # Build combined MCP config
+        MCP_JSON='{"mcpServers":{}}'
+
+        for SERVER in $ENABLED_SERVERS; do
+            TEMPLATE_FILE="$MCP_TEMPLATES_DIR/${SERVER}.json"
+            if [ -f "$TEMPLATE_FILE" ]; then
+                # Hydrate template and merge into combined config
+                HYDRATED=$(sed "s|{{MCP_GATEWAY_URL}}|$MCP_GATEWAY_URL|g" "$TEMPLATE_FILE")
+                MCP_JSON=$(echo "$MCP_JSON" | jq --argjson server "{\"$SERVER\": $HYDRATED}" '.mcpServers += $server')
+                MCP_COUNT=$((MCP_COUNT + 1))
+            else
+                echo "[install] WARNING: Template $TEMPLATE_FILE not found for enabled server $SERVER"
+            fi
+        done
+
+        echo "$MCP_JSON" > "$WORKSPACE_ROOT/.mcp.json"
+        echo "[install] Generated .mcp.json with $MCP_COUNT server(s)"
+    else
+        # No enabled servers, create default with mcp-gateway
+        echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$WORKSPACE_ROOT/.mcp.json"
+        MCP_COUNT=1
+        echo "[install] Generated .mcp.json with 1 server(s) (default)"
+    fi
+else
+    # No config.json, create default with mcp-gateway
+    echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$WORKSPACE_ROOT/.mcp.json"
+    MCP_COUNT=1
+    echo "[install] Generated .mcp.json with 1 server(s) (default)"
+fi
+
+# Install GSD framework
+if [ -d "$CLAUDE_DIR/commands/gsd" ] && [ "$(ls -A "$CLAUDE_DIR/commands/gsd" 2>/dev/null)" ]; then
+    echo "[install] GSD: already installed, skipping"
+    # Count existing installation
+    GSD_COMMANDS=$(find "$CLAUDE_DIR/commands/gsd" -name "*.md" 2>/dev/null | wc -l || echo 0)
+    GSD_AGENTS=$(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null | wc -l || echo 0)
+else
+    echo "[install] Installing GSD framework..."
+    if npx get-shit-done-cc --claude --global > /dev/null 2>&1; then
+        echo "[install] GSD framework installed"
+        # Count after installation
+        GSD_COMMANDS=$(find "$CLAUDE_DIR/commands/gsd" -name "*.md" 2>/dev/null | wc -l || echo 0)
+        GSD_AGENTS=$(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null | wc -l || echo 0)
+    else
+        echo "[install] WARNING: GSD installation failed"
+        GSD_COMMANDS=0
+        GSD_AGENTS=0
+    fi
+fi
+
+# Print summary
+echo "[install] --- Summary ---"
+echo "[install] Config: $CONFIG_STATUS"
+echo "[install] Secrets: $SECRETS_STATUS"
+echo "[install] Settings: generated"
+echo "[install] Credentials: $CREDS_STATUS"
+echo "[install] MCP: $MCP_COUNT server(s)"
+echo "[install] GSD: $GSD_COMMANDS commands + $GSD_AGENTS agents"
+echo "[install] Done."
