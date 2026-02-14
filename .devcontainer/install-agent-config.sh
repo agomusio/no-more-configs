@@ -138,6 +138,37 @@ fi
 DOMAIN_COUNT=$(grep -c '^[^#]' "$FIREWALL_CONF" | tr -d '[:space:]')
 echo "[install] Generated firewall-domains.conf with $DOMAIN_COUNT domain(s)"
 
+# Generate .vscode/settings.json from config.json (GEN-03)
+VSCODE_DIR="$WORKSPACE_ROOT/.vscode"
+mkdir -p "$VSCODE_DIR"
+
+# Read git scan paths from config.json
+GIT_SCAN_PATHS='[".", "gitprojects/adventure-alerts"]'
+if [ -f "$CONFIG_FILE" ]; then
+    CONFIGURED_PATHS=$(jq -r '.vscode.git_scan_paths // []' "$CONFIG_FILE" 2>/dev/null || echo "[]")
+    # If configured paths is non-empty array, use it; otherwise auto-detect
+    PATH_COUNT=$(echo "$CONFIGURED_PATHS" | jq 'length' 2>/dev/null || echo "0")
+    if [ "$PATH_COUNT" -gt 0 ]; then
+        # User specified paths — prepend "." (workspace root) if not present
+        GIT_SCAN_PATHS=$(echo "$CONFIGURED_PATHS" | jq '. as $paths | if (. | index(".")) then $paths else ["."] + $paths end')
+    else
+        # Auto-detect: find .git directories under gitprojects/
+        DETECTED='["."]'
+        if [ -d "$WORKSPACE_ROOT/gitprojects" ]; then
+            for git_dir in "$WORKSPACE_ROOT/gitprojects"/*/.git; do
+                if [ -d "$git_dir" ]; then
+                    project_name=$(basename "$(dirname "$git_dir")")
+                    DETECTED=$(echo "$DETECTED" | jq --arg p "gitprojects/$project_name" '. + [$p]')
+                fi
+            done
+        fi
+        GIT_SCAN_PATHS="$DETECTED"
+    fi
+fi
+
+jq -n --argjson paths "$GIT_SCAN_PATHS" '{"git.scanRepositories": $paths}' > "$VSCODE_DIR/settings.json"
+echo "[install] Generated .vscode/settings.json with $(echo "$GIT_SCAN_PATHS" | jq 'length') scan path(s)"
+
 # Create directories (idempotent)
 mkdir -p "$CLAUDE_DIR/skills"
 mkdir -p "$CLAUDE_DIR/hooks"

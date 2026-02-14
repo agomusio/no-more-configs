@@ -26,6 +26,9 @@ secrets.json
 # Generated MCP config (created by mcp-setup on container start)
 .mcp.json
 
+# Generated VS Code settings (created by install-agent-config.sh)
+.vscode/settings.json
+
 # Temp prompts
 opus-refactor-prompt.md
 claude-auth-investigation.md
