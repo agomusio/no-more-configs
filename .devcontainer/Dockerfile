@@ -128,6 +128,10 @@ RUN echo "export LANGFUSE_STACK_DIR=/workspace/infra" >> /home/node/.bashrc && \
     echo "export LANGFUSE_STACK_DIR=/workspace/infra" >> /home/node/.zshrc && \
     echo "export CLAUDE_WORKSPACE=/workspace" >> /home/node/.zshrc
 
+# Source API key environment file for interactive shells (CRD-03)
+RUN echo "source ~/.claude-api-env 2>/dev/null || true" >> /home/node/.bashrc && \
+    echo "source ~/.claude-api-env 2>/dev/null || true" >> /home/node/.zshrc
+
 # Verify as the node user
 RUN claude --version
 
@@ -139,6 +143,12 @@ COPY --chown=node:node mcp-setup-bin.sh /tmp/mcp-setup-bin.sh
 RUN sudo cp /tmp/mcp-setup-bin.sh /usr/local/bin/mcp-setup && \
     sudo chmod +x /usr/local/bin/mcp-setup && \
     rm /tmp/mcp-setup-bin.sh
+
+# Install save-secrets helper
+COPY --chown=node:node save-secrets.sh /tmp/save-secrets.sh
+RUN sudo cp /tmp/save-secrets.sh /usr/local/bin/save-secrets && \
+    sudo chmod +x /usr/local/bin/save-secrets && \
+    rm /tmp/save-secrets.sh
 
 # Add claudey/claudeyr aliases to both shell configs
 RUN echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
