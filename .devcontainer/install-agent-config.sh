@@ -342,9 +342,117 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
             continue
         fi
 
-        # Plugin is valid and enabled — proceed to file copying (Task 2)
+        # Plugin is valid and enabled — proceed to file copying
+
+        # Copy skills (cross-agent: Claude + Codex)
+        if [ -d "$plugin_dir/skills" ]; then
+            cp -r "$plugin_dir/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
+            cp -r "$plugin_dir/skills/"* /home/node/.codex/skills/ 2>/dev/null || true
+            plugin_skills=$(find "$plugin_dir/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
+        fi
+
+        # Copy hooks
+        if [ -d "$plugin_dir/hooks" ]; then
+            for hook_file in "$plugin_dir/hooks"/*; do
+                [ -f "$hook_file" ] || continue
+                cp "$hook_file" "$CLAUDE_DIR/hooks/"
+            done
+            plugin_hooks_count=$(find "$plugin_dir/hooks" -maxdepth 1 -type f 2>/dev/null | wc -l)
+        fi
+
+        # Copy commands (with GSD protection)
+        if [ -d "$plugin_dir/commands" ]; then
+            # Check for GSD directory conflict
+            if [ -d "$plugin_dir/commands/gsd" ]; then
+                echo "[install] ERROR: Plugin '$plugin_name' attempted to overwrite GSD-protected directory commands/gsd/ -- skipping"
+                PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+            fi
+            for cmd_file in "$plugin_dir/commands"/*.md; do
+                [ -f "$cmd_file" ] || continue
+                cp "$cmd_file" "$CLAUDE_DIR/commands/"
+            done
+            plugin_cmds=$(find "$plugin_dir/commands" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+        fi
+
+        # Copy agents (with GSD protection)
+        if [ -d "$plugin_dir/agents" ]; then
+            for agent_file in "$plugin_dir/agents"/*.md; do
+                [ -f "$agent_file" ] || continue
+                agent_name=$(basename "$agent_file")
+                if [[ "$agent_name" =~ ^gsd- ]]; then
+                    echo "[install] ERROR: Plugin '$plugin_name' attempted to overwrite GSD-protected file agents/$agent_name -- skipping"
+                    PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                    continue
+                fi
+                cp "$agent_file" "$CLAUDE_DIR/agents/"
+            done
+            plugin_agents=$(find "$plugin_dir/agents" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+        fi
+
+        # Accumulate hook registrations
+        MANIFEST_HOOKS=$(jq -r '.hooks // {}' "$MANIFEST" 2>/dev/null)
+        if [ "$MANIFEST_HOOKS" != "{}" ] && [ "$MANIFEST_HOOKS" != "null" ]; then
+            PLUGIN_HOOKS=$(jq -n --argjson acc "$PLUGIN_HOOKS" --argjson new "$MANIFEST_HOOKS" '
+                $new | to_entries | reduce .[] as $entry ($acc;
+                    .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
+                )
+            ' 2>/dev/null || echo "$PLUGIN_HOOKS")
+        fi
+
+        # Accumulate environment variables with conflict detection
+        MANIFEST_ENV=$(jq -r '.env // {}' "$MANIFEST" 2>/dev/null)
+        if [ "$MANIFEST_ENV" != "{}" ] && [ "$MANIFEST_ENV" != "null" ]; then
+            # Check for conflicts: any key in MANIFEST_ENV that already exists in PLUGIN_ENV
+            CONFLICTS=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson new "$MANIFEST_ENV" '
+                [$new | keys[] | select(. as $k | $existing | has($k))]
+            ' 2>/dev/null)
+            if [ "$CONFLICTS" != "[]" ] && [ -n "$CONFLICTS" ]; then
+                echo "[install] WARNING: Plugin '$plugin_name' env var conflict: $CONFLICTS -- using earlier plugin's values"
+                PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                # Only add non-conflicting keys
+                PLUGIN_ENV=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson new "$MANIFEST_ENV" '
+                    $existing + ($new | to_entries | map(select(.key as $k | $existing | has($k) | not)) | from_entries)
+                ' 2>/dev/null || echo "$PLUGIN_ENV")
+            else
+                PLUGIN_ENV=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson new "$MANIFEST_ENV" '
+                    $existing + $new
+                ' 2>/dev/null || echo "$PLUGIN_ENV")
+            fi
+
+            # Apply config.json overrides (always take precedence)
+            if [ -f "$CONFIG_FILE" ]; then
+                CONFIG_ENV_OVERRIDES=$(jq -r --arg name "$plugin_name" '.plugins[$name].env // {}' "$CONFIG_FILE" 2>/dev/null || echo "{}")
+                if [ "$CONFIG_ENV_OVERRIDES" != "{}" ]; then
+                    PLUGIN_ENV=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson overrides "$CONFIG_ENV_OVERRIDES" '
+                        $existing * $overrides
+                    ' 2>/dev/null || echo "$PLUGIN_ENV")
+                fi
+            fi
+        fi
+
+        # Per-plugin detail logging
+        detail_parts=()
+        [ "${plugin_skills:-0}" -gt 0 ] && detail_parts+=("${plugin_skills} skill(s)")
+        [ "${plugin_hooks_count:-0}" -gt 0 ] && detail_parts+=("${plugin_hooks_count} hook(s)")
+        [ "${plugin_cmds:-0}" -gt 0 ] && detail_parts+=("${plugin_cmds} command(s)")
+        [ "${plugin_agents:-0}" -gt 0 ] && detail_parts+=("${plugin_agents} agent(s)")
+
+        # Count env vars from this plugin's manifest
+        plugin_env_count=$(jq -r '.env // {} | length' "$MANIFEST" 2>/dev/null || echo "0")
+        [ "$plugin_env_count" -gt 0 ] && detail_parts+=("${plugin_env_count} env var(s)")
+
+        detail_str=$(IFS=", "; echo "${detail_parts[*]}")
+        if [ -n "$detail_str" ]; then
+            echo "[install] Plugin '$plugin_name': installed ($detail_str)"
+        else
+            echo "[install] Plugin '$plugin_name': installed (manifest only)"
+        fi
+        PLUGIN_INSTALLED=$((PLUGIN_INSTALLED + 1))
 
     done
+
+    # Log plugin installation summary
+    echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 fi
 
 # Restore Claude credentials (if available)
