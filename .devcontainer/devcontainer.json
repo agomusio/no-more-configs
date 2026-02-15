@@ -52,11 +52,7 @@
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
     "LANGFUSE_HOST": "http://host.docker.internal:3052",
-    "MCP_GATEWAY_URL": "http://host.docker.internal:8811",
-    "GIT_AUTHOR_NAME": "${localEnv:GIT_AUTHOR_NAME}",
-    "GIT_AUTHOR_EMAIL": "${localEnv:GIT_AUTHOR_EMAIL}",
-    "GIT_COMMITTER_NAME": "${localEnv:GIT_AUTHOR_NAME}",
-    "GIT_COMMITTER_EMAIL": "${localEnv:GIT_AUTHOR_EMAIL}"
+    "MCP_GATEWAY_URL": "http://host.docker.internal:8811"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",

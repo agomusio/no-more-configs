@@ -6,10 +6,5 @@ set -euo pipefail
 # Claude Code with --dangerously-skip-permissions can execute arbitrary docker commands.
 sudo chmod 666 /var/run/docker.sock
 
-if [ -n "${GIT_AUTHOR_EMAIL:-}" ]; then
-    git config --global user.email "$GIT_AUTHOR_EMAIL"
-    git config --global user.name "${GIT_AUTHOR_NAME:-developer}"
-    echo "✅ Git: Identity configured from environment"
-else
-    echo "⚠️ Git identity not set. Export GIT_AUTHOR_NAME and GIT_AUTHOR_EMAIL on your host."
-fi
+# Git identity is restored from secrets.json by install-agent-config.sh.
+# Run save-secrets after setting git config to persist across rebuilds.
