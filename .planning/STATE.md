@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 4 of 7 (Core Plugin System)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Executing
-Last activity: 2026-02-15 — Completed 04-01-PLAN.md
+Last activity: 2026-02-15 — Completed 04-02-PLAN.md
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
@@ -24,15 +24,15 @@ Progress: [███░░░░░░░] 33%
 - Total execution time: ~22 min
 
 **v1.2 Velocity:**
-- Total plans completed: 1
-- Average duration: 1.1 min
-- Total execution time: 0.02 hours
+- Total plans completed: 2
+- Average duration: 1.4 min
+- Total execution time: 0.05 hours
 
 **By Phase (v1.2):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 4. Core Plugin System | 1 | 1.1 min | 1.1 min |
+| 4. Core Plugin System | 2 | 2.9 min | 1.4 min |
 
 ## Accumulated Context
 
@@ -44,6 +44,11 @@ Recent decisions affecting current work:
 - [Phase 04-01]: GSD namespace protection for standalone commands (skip any command named gsd)
 - [Phase 04-01]: Skills copied to both Claude and Codex directories for cross-agent support
 - [Phase 04-01]: Codex config.toml includes [features] skills = true for skill discovery
+- [Phase 04-02]: Plugins not in config.json default to enabled
+- [Phase 04-02]: Plugin name must match directory name (validation requirement)
+- [Phase 04-02]: First alphabetically wins for env var conflicts
+- [Phase 04-02]: config.json env overrides always take precedence
+- [Phase 04-02]: GSD protection applies to commands/gsd/ directory and gsd-* agent files
 
 ### Pending Todos
 
@@ -56,8 +61,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-core-plugin-system/04-01-SUMMARY.md
+Stopped at: Completed 04-02-PLAN.md
+Resume file: .planning/phases/04-core-plugin-system/04-02-SUMMARY.md
 
 ---
 *State updated: 2026-02-15 for milestone v1.2*
