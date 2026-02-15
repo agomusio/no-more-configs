@@ -1,10 +1,13 @@
 #!/bin/sh
-# MCP setup script - auto-generates .mcp.json and checks gateway health
+# MCP setup script - auto-generates global .mcp.json and checks gateway health
 
 gateway_url="${MCP_GATEWAY_URL:-http://host.docker.internal:8811}"
+claude_dir="${HOME}/.claude"
 
-# Generate .mcp.json at workspace root
-cat <<EOF > /workspace/.mcp.json
+mkdir -p "$claude_dir"
+
+# Generate .mcp.json in global Claude config
+cat <<EOF > "${claude_dir}/.mcp.json"
 {
   "mcpServers": {
     "mcp-gateway": {
@@ -15,7 +18,7 @@ cat <<EOF > /workspace/.mcp.json
 }
 EOF
 
-echo "✓ Generated /workspace/.mcp.json"
+echo "✓ Generated ${claude_dir}/.mcp.json"
 
 # Poll gateway health endpoint with retry logic
 echo "Checking gateway health at ${gateway_url}/health..."
@@ -31,7 +34,7 @@ else
 fi
 
 echo ""
-echo "Config: /workspace/.mcp.json"
+echo "Config: ${claude_dir}/.mcp.json"
 echo "Gateway: ${gateway_url}"
 echo "Next: Restart Claude Code session to pick up MCP tools"
 echo "To add servers: Edit ${LANGFUSE_STACK_DIR:-/workspace/infra}/mcp/mcp.json, restart gateway, then re-run mcp-setup"

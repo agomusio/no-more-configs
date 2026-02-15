@@ -150,11 +150,9 @@ RUN sudo cp /tmp/save-secrets.sh /usr/local/bin/save-secrets && \
     sudo chmod +x /usr/local/bin/save-secrets && \
     rm /tmp/save-secrets.sh
 
-# Add claudey/claudeyr aliases to both shell configs
-RUN echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.bashrc && \
-    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.bashrc && \
-    echo "alias claudey='claude --dangerously-skip-permissions'" >> /home/node/.zshrc && \
-    echo "alias claudeyr='claude --dangerously-skip-permissions --resume'" >> /home/node/.zshrc
+# Add clauder alias (resume) to both shell configs
+RUN echo "alias clauder='claude --resume'" >> /home/node/.bashrc && \
+    echo "alias clauder='claude --resume'" >> /home/node/.zshrc
 
 # Copy frequently changed infrastructure scripts later for better layer caching
 COPY --chown=node:node init-firewall.sh /tmp/init-firewall.sh

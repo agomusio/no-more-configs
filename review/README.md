@@ -1,4 +1,4 @@
-# docs/
+# review/
 
 Outputs from ChatGPT Codex reviews, suggestions, and plans for this repository. Files here are Codex-generated artifacts — specs, RFCs, audits, and recommendations — preserved for reference.
 

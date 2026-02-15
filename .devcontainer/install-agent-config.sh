@@ -210,6 +210,23 @@ else
     echo "[install] WARNING: settings.json.template not found — skipping settings generation"
 fi
 
+# Enable bypassPermissions globally so bare `claude` runs without permission prompts.
+# This is the container-local equivalent of --dangerously-skip-permissions.
+# It can be toggled off per-session with `claude --no-dangerously-skip-permissions`.
+if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
+    jq -n '{"permissions":{"allow":[],"deny":[],"additionalDirectories":[],"defaultMode":"bypassPermissions"}}' \
+        > "$CLAUDE_DIR/settings.json"
+    echo "[install] Generated settings.json (bypassPermissions enabled)"
+else
+    # Ensure bypassPermissions is set even if settings.json already exists
+    CURRENT_MODE=$(jq -r '.permissions.defaultMode // ""' "$CLAUDE_DIR/settings.json" 2>/dev/null || echo "")
+    if [ "$CURRENT_MODE" != "bypassPermissions" ]; then
+        jq '.permissions.defaultMode = "bypassPermissions"' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+            && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+        echo "[install] Updated settings.json (bypassPermissions enabled)"
+    fi
+fi
+
 # Restore Claude credentials (if available)
 if [ -f "$SECRETS_FILE" ]; then
     CLAUDE_CREDS=$(jq -e '.claude.credentials // {}' "$SECRETS_FILE" 2>/dev/null || echo "{}")
@@ -264,24 +281,24 @@ if [ -f "$CONFIG_FILE" ]; then
             fi
         done
 
-        echo "$MCP_JSON" > "$WORKSPACE_ROOT/.mcp.json"
+        echo "$MCP_JSON" > "$CLAUDE_DIR/.mcp.json"
         echo "[install] Generated .mcp.json with $MCP_COUNT server(s)"
     else
         # No enabled servers, create default with mcp-gateway
-        echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$WORKSPACE_ROOT/.mcp.json"
+        echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$CLAUDE_DIR/.mcp.json"
         MCP_COUNT=1
         echo "[install] Generated .mcp.json with 1 server(s) (default)"
     fi
 else
     # No config.json, create default with mcp-gateway
-    echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$WORKSPACE_ROOT/.mcp.json"
+    echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$CLAUDE_DIR/.mcp.json"
     MCP_COUNT=1
     echo "[install] Generated .mcp.json with 1 server(s) (default)"
 fi
 
 # Detect unresolved {{PLACEHOLDER}} tokens in generated files (GEN-06)
 UNRESOLVED=""
-for generated_file in "$CLAUDE_DIR/settings.local.json" "$WORKSPACE_ROOT/.mcp.json"; do
+for generated_file in "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/.mcp.json"; do
     if [ -f "$generated_file" ]; then
         tokens=$(grep -oP '\{\{[A-Z_]+\}\}' "$generated_file" 2>/dev/null || true)
         if [ -n "$tokens" ]; then

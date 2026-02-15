@@ -68,8 +68,8 @@ echo "  jq . agent-config/settings.json.template"
 
 echo ""
 echo "=== Output ==="
-echo "  Write all review files to docs/ (e.g. docs/codex-dockerfile-audit.md)"
-echo "  Update the table in docs/README.md with each new file"
+echo "  Write all review files to review/ (e.g. review/codex-dockerfile-audit.md)"
+echo "  Update the table in review/README.md with each new file"
 
 echo ""
 echo "Setup complete."

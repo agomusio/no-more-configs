@@ -9,7 +9,7 @@
     "defaults": {}
   },
   "vscode": {
-    "git_scan_paths": []
+    "git_scan_paths": ["gitprojects/adventure-alerts"]
   },
   "mcp_servers": {
     "mcp-gateway": {

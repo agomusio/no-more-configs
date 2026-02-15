@@ -23,9 +23,8 @@ __pycache__/
 # Sandbox secrets (credentials, API keys)
 secrets.json
 
-# Generated at runtime (install-agent-config.sh / mcp-setup)
-.mcp.json
-.vscode/settings.json
+# Generated at runtime (install-agent-config.sh)
+.vscode/
 .devcontainer/firewall-domains.conf
 
 # Host-side Claude Code artifacts (not part of container config)

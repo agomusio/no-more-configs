@@ -16,7 +16,7 @@ done
 
 if [ "$MISSING" -eq 1 ]; then
   echo "Some tools are missing. Re-running setup..."
-  bash docs/codex-setup.sh
+  bash review/codex-setup.sh
 else
   echo "  All tools present."
 fi
