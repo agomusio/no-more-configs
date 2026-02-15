@@ -62,8 +62,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Roadmap creation complete for v1.2
-Resume file: None
+Stopped at: Phase 4 context gathered
+Resume file: .planning/phases/04-core-plugin-system/04-CONTEXT.md
 
 ---
 *State updated: 2026-02-15 for milestone v1.2*
