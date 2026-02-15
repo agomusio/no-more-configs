@@ -12,7 +12,7 @@ CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-/home/node/.claude}"
 if [ -f "$SECRETS_FILE" ]; then
     SECRETS=$(cat "$SECRETS_FILE")
 else
-    SECRETS='{"git":{"name":"","email":""},"claude":{"credentials":{}},"codex":{"auth":{}},"langfuse":{"public_key":"","secret_key":""},"api_keys":{"openai":"","google":""}}'
+    SECRETS='{"git":{"name":"","email":""},"claude":{"credentials":{}},"codex":{"auth":{}},"infra":{}}'
 fi
 
 echo "[save-secrets] Capturing live credentials..."
@@ -46,38 +46,58 @@ else
     echo "[save-secrets] Codex credentials: not found (run 'codex' to authenticate)"
 fi
 
-# Capture Langfuse keys (try settings.local.json first, fall back to infra/.env)
-LF_PK=""
-LF_SK=""
-if [ -f "$CLAUDE_DIR/settings.local.json" ]; then
-    LF_PK=$(jq -r '.env.LANGFUSE_PUBLIC_KEY // ""' "$CLAUDE_DIR/settings.local.json" 2>/dev/null || echo "")
-    LF_SK=$(jq -r '.env.LANGFUSE_SECRET_KEY // ""' "$CLAUDE_DIR/settings.local.json" 2>/dev/null || echo "")
-fi
-# Fall back to infra/.env if settings.local.json didn't have them
+# Capture infrastructure secrets from infra/.env (includes Langfuse project keys)
 INFRA_ENV="/workspace/infra/.env"
-if [ -z "$LF_SK" ] && [ -f "$INFRA_ENV" ]; then
-    LF_PK=$(grep -oP '^LANGFUSE_INIT_PROJECT_PUBLIC_KEY=\K.*' "$INFRA_ENV" 2>/dev/null || echo "pk-lf-local-claude-code")
-    LF_SK=$(grep -oP '^LANGFUSE_INIT_PROJECT_SECRET_KEY=\K.*' "$INFRA_ENV" 2>/dev/null || echo "")
-    [ -z "$LF_PK" ] && LF_PK="pk-lf-local-claude-code"
-fi
-if [ -n "$LF_PK" ] || [ -n "$LF_SK" ]; then
-    if [ -n "$LF_PK" ]; then
-        SECRETS=$(echo "$SECRETS" | jq --arg pk "$LF_PK" '.langfuse.public_key = $pk')
-    fi
-    if [ -n "$LF_SK" ]; then
-        SECRETS=$(echo "$SECRETS" | jq --arg sk "$LF_SK" '.langfuse.secret_key = $sk')
-    fi
-    echo "[save-secrets] Langfuse keys: captured"
-fi
+if [ -f "$INFRA_ENV" ]; then
+    get_env() { grep -oP "^$1=\\K.*" "$INFRA_ENV" 2>/dev/null || echo ""; }
 
-# Capture API keys from environment
-if [ -n "${OPENAI_API_KEY:-}" ]; then
-    SECRETS=$(echo "$SECRETS" | jq --arg key "$OPENAI_API_KEY" '.api_keys.openai = $key')
-    echo "[save-secrets] OpenAI API key: captured"
-fi
-if [ -n "${GOOGLE_API_KEY:-}" ]; then
-    SECRETS=$(echo "$SECRETS" | jq --arg key "$GOOGLE_API_KEY" '.api_keys.google = $key')
-    echo "[save-secrets] Google API key: captured"
+    INFRA_PG=$(get_env "POSTGRES_PASSWORD")
+    INFRA_EK=$(get_env "ENCRYPTION_KEY")
+    INFRA_NAS=$(get_env "NEXTAUTH_SECRET")
+    INFRA_SALT=$(get_env "SALT")
+    INFRA_CH=$(get_env "CLICKHOUSE_PASSWORD")
+    INFRA_MINIO=$(get_env "MINIO_ROOT_PASSWORD")
+    INFRA_REDIS=$(get_env "REDIS_AUTH")
+    INFRA_LF_PK=$(get_env "LANGFUSE_INIT_PROJECT_PUBLIC_KEY")
+    INFRA_LF_SK=$(get_env "LANGFUSE_INIT_PROJECT_SECRET_KEY")
+    INFRA_EMAIL=$(get_env "LANGFUSE_INIT_USER_EMAIL")
+    INFRA_NAME=$(get_env "LANGFUSE_INIT_USER_NAME")
+    INFRA_PASS=$(get_env "LANGFUSE_INIT_USER_PASSWORD")
+    INFRA_ORG=$(get_env "LANGFUSE_INIT_ORG_NAME")
+    [ -z "$INFRA_LF_PK" ] && INFRA_LF_PK="pk-lf-local-claude-code"
+
+    if [ -n "$INFRA_PG" ]; then
+        SECRETS=$(echo "$SECRETS" | jq \
+            --arg pg "$INFRA_PG" \
+            --arg ek "$INFRA_EK" \
+            --arg nas "$INFRA_NAS" \
+            --arg salt "$INFRA_SALT" \
+            --arg ch "$INFRA_CH" \
+            --arg minio "$INFRA_MINIO" \
+            --arg redis "$INFRA_REDIS" \
+            --arg lf_pk "$INFRA_LF_PK" \
+            --arg lf_sk "$INFRA_LF_SK" \
+            --arg email "$INFRA_EMAIL" \
+            --arg name "$INFRA_NAME" \
+            --arg pass "$INFRA_PASS" \
+            --arg org "$INFRA_ORG" \
+            '.infra = {
+                postgres_password: $pg,
+                encryption_key: $ek,
+                nextauth_secret: $nas,
+                salt: $salt,
+                clickhouse_password: $ch,
+                minio_root_password: $minio,
+                redis_auth: $redis,
+                langfuse_project_public_key: $lf_pk,
+                langfuse_project_secret_key: $lf_sk,
+                langfuse_user_email: $email,
+                langfuse_user_name: $name,
+                langfuse_user_password: $pass,
+                langfuse_org_name: $org
+            }')
+        echo "[save-secrets] Infrastructure secrets: captured"
+    fi
 fi
 
 # Write back to secrets.json

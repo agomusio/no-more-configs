@@ -110,8 +110,8 @@ services:
       CLICKHOUSE_USER: clickhouse
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     volumes:
-      - langfuse_clickhouse_data:/var/lib/clickhouse
-      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+      - ./data/clickhouse/data:/var/lib/clickhouse
+      - ./data/clickhouse/logs:/var/log/clickhouse-server
     ports:
       - 127.0.0.1:8124:8123
       - 127.0.0.1:9000:9000
@@ -140,7 +140,7 @@ services:
       - 127.0.0.1:9090:9000
       - 127.0.0.1:9091:9001
     volumes:
-      - langfuse_minio_data:/data
+      - ./data/minio:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -163,6 +163,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - SETUID
+      - SETGID
     ports:
       - 127.0.0.1:6379:6379
     healthcheck:
@@ -181,6 +184,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - FOWNER
+      - DAC_OVERRIDE
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
@@ -196,7 +205,7 @@ services:
     ports:
       - 127.0.0.1:5433:5432
     volumes:
-      - langfuse_postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
 
   docker-mcp-gateway:
     image: docker/mcp-gateway:latest
@@ -233,12 +242,3 @@ services:
     profiles:
       - mcp-docker-tools
 
-volumes:
-  langfuse_postgres_data:
-    driver: local
-  langfuse_clickhouse_data:
-    driver: local
-  langfuse_clickhouse_logs:
-    driver: local
-  langfuse_minio_data:
-    driver: local

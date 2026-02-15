@@ -8,6 +8,9 @@
   "codex": {
     "model": "gpt-5.3-codex"
   },
+  "infra": {
+    "mcp_workspace_bind": "c:\\Users\\sam\\Dev-Projects\\claude-code-sandbox"
+  },
   "agent": {
     "defaults": {}
   },

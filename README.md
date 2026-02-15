@@ -74,13 +74,10 @@ save-secrets
 If you want conversation tracing:
 
 ```bash
-cd /workspace/infra
-./scripts/generate-env.sh      # Creates .env with random secrets
-sudo docker compose up -d      # Starts all 8 services
-save-secrets                   # Captures Langfuse keys into secrets.json
+langfuse-setup
 ```
 
-Wait 30-60s, then verify at `http://localhost:3052`.
+This generates credentials (into `secrets.json`), starts the stack, and verifies health. View traces at `http://localhost:3052`.
 
 ### 4. Done
 
@@ -261,6 +258,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 | `codex` | Codex CLI — GPT-5.3-Codex, full-auto, no sandbox |
 | `codexr` | Alias for `codex --resume` |
 | `save-secrets` | Capture live credentials, git identity, and keys to `secrets.json` |
+| `langfuse-setup` | Generate secrets, start Langfuse stack, verify health |
 | `mcp-setup` | Regenerate `.mcp.json` from templates and health-check MCP gateway |
 
 ---
