@@ -455,6 +455,41 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
     echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 fi
 
+# --- Merge Plugin Registrations ---
+
+# Merge plugin hooks into settings.local.json
+if [ "$PLUGIN_HOOKS" != "{}" ]; then
+    SETTINGS_FILE="$CLAUDE_DIR/settings.local.json"
+    if [ -f "$SETTINGS_FILE" ]; then
+        # Merge plugin hooks with existing template hooks
+        # Uses array concatenation (+) to ACCUMULATE hooks, not overwrite
+        # Template hooks (e.g., langfuse Stop hook) are preserved
+        # Plugin hooks are wrapped in {hooks: [...]} objects and appended to each event array
+        jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
+            # For each event in plugin_hooks, append new hook entries to existing array
+            reduce ($plugin_hooks | to_entries[]) as $entry (.;
+                .hooks[$entry.key] = ((.hooks[$entry.key] // []) + [{"hooks": $entry.value}])
+            )
+        ' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
+            && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        echo "[install] Merged plugin hooks into settings.local.json"
+    fi
+fi
+
+# Merge plugin env vars into settings.local.json
+if [ "$PLUGIN_ENV" != "{}" ]; then
+    SETTINGS_FILE="$CLAUDE_DIR/settings.local.json"
+    if [ -f "$SETTINGS_FILE" ]; then
+        # Plugin env vars are added to the .env section
+        # Existing template env vars are preserved (plugin env uses + which adds new keys)
+        # config.json overrides were already applied during accumulation (Plan 02)
+        jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' \
+            "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
+            && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        echo "[install] Merged plugin env vars into settings.local.json"
+    fi
+fi
+
 # Restore Claude credentials (if available)
 if [ -f "$SECRETS_FILE" ]; then
     CLAUDE_CREDS=$(jq -e '.claude.credentials // {}' "$SECRETS_FILE" 2>/dev/null || echo "{}")
