@@ -1,0 +1,84 @@
+{
+  "name": "plugin-dev",
+  "version": "1.0.0",
+  "description": "A comprehensive toolkit for developing Claude Code plugins with expert guidance on hooks, MCP integration, plugin structure, settings, commands, agents, and skill development.",
+  "author": "Anthropic",
+  "license": "MIT",
+  "keywords": [
+    "plugin-development",
+    "plugin-structure",
+    "hooks",
+    "mcp-integration",
+    "command-development",
+    "agent-development",
+    "skill-development",
+    "plugin-settings"
+  ],
+  "homepage": "https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/claude-code.git",
+    "directory": "plugins/plugin-dev"
+  },
+  "commands": [
+    {
+      "name": "create-plugin",
+      "file": "commands/create-plugin.md",
+      "description": "Guided 8-phase workflow for creating plugins from scratch"
+    }
+  ],
+  "agents": [
+    {
+      "name": "agent-creator",
+      "file": "agents/agent-creator.md",
+      "description": "AI-assisted agent generator for creating autonomous agents"
+    },
+    {
+      "name": "plugin-validator",
+      "file": "agents/plugin-validator.md",
+      "description": "Validates plugin structure, manifest, components, and best practices"
+    },
+    {
+      "name": "skill-reviewer",
+      "file": "agents/skill-reviewer.md",
+      "description": "Reviews skills for quality, structure, and best practices"
+    }
+  ],
+  "skills": [
+    {
+      "name": "hook-development",
+      "file": "skills/hook-development/SKILL.md",
+      "description": "Expert guidance on creating event-driven hooks and automation"
+    },
+    {
+      "name": "mcp-integration",
+      "file": "skills/mcp-integration/SKILL.md",
+      "description": "Integration patterns for Model Context Protocol servers"
+    },
+    {
+      "name": "plugin-structure",
+      "file": "skills/plugin-structure/SKILL.md",
+      "description": "Plugin organization, manifest configuration, and auto-discovery"
+    },
+    {
+      "name": "plugin-settings",
+      "file": "skills/plugin-settings/SKILL.md",
+      "description": "Configuration patterns using .claude/plugin-name.local.md files"
+    },
+    {
+      "name": "command-development",
+      "file": "skills/command-development/SKILL.md",
+      "description": "Creating slash commands with frontmatter and dynamic arguments"
+    },
+    {
+      "name": "agent-development",
+      "file": "skills/agent-development/SKILL.md",
+      "description": "Creating autonomous agents with AI-assisted generation"
+    },
+    {
+      "name": "skill-development",
+      "file": "skills/skill-development/SKILL.md",
+      "description": "Creating skills with progressive disclosure and strong triggers"
+    }
+  ]
+}
