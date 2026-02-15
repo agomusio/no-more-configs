@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Plugin discovery, validation, file copying, and hook/env registration with GSD protection. Users can add a plugin directory to `agent-config/plugins/`, rebuild the container, and have their plugin's skills, hooks, commands, agents, and environment variables integrated into Claude Code. Standalone commands from `agent-config/commands/` are also supported. MCP server registration is Phase 5. Enhanced validation/warnings are Phase 7.
+Plugin discovery, validation, file copying, and hook/env registration with GSD protection. Users can add a plugin directory to `agent-config/plugins/`, rebuild the container, and have their plugin's skills, hooks, commands, agents, and environment variables integrated into Claude Code and Codex CLI. Standalone commands from `agent-config/commands/` are also supported. MCP server registration is Phase 5. Enhanced validation/warnings are Phase 7.
 
 </domain>
 
@@ -37,6 +37,13 @@ Plugin discovery, validation, file copying, and hook/env registration with GSD p
 - **Missing/invalid plugin.json**: skip everything — no files copied, no registrations, nothing installs. Clean skip with info message.
 - **Plugin name mismatch**: `plugin.json` name field must match directory name — mismatch is an error, plugin is skipped with warning
 
+### Cross-Agent Skill Installation
+- Skills are copied to **both** `~/.claude/skills/` and `~/.codex/skills/` — same directory structure, same files, single source
+- Applies to standalone skills (`agent-config/skills/`) AND plugin skills (`plugins/*/skills/`)
+- Enable Codex skill discovery: add `skills = true` under `[features]` in generated Codex `config.toml`
+- **Only skills are cross-agent** — hooks, commands, agents, and MCP servers remain Claude-only (Codex has no equivalent lifecycle hook system)
+- Install feedback reflects the dual destination: `"[install] Skills: 4 skill(s) → Claude + Codex"`
+
 ### Claude's Discretion
 - Install script architecture (functions, helpers, inline code)
 - Exact log message formatting beyond the patterns described above
@@ -54,6 +61,7 @@ Plugin discovery, validation, file copying, and hook/env registration with GSD p
 - Plugin name must match directory name is also **stricter than spec** — spec doesn't mention this validation. Add it.
 - Install output should feel like the existing `[install]` prefixed lines — same style, just more detail for plugins
 - The recap block at the end should give a quick "at a glance" view of what the plugin system did during this rebuild
+- Cross-agent skill installation is a **post-spec addition** — not in `nmc-plugin-spec.md` but decided during context gathering. Codex CLI now supports the same SKILL.md convention.
 
 </specifics>
 
