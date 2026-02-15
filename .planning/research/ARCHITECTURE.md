@@ -1,481 +1,799 @@
-# Architecture Patterns
+# Architecture Integration: Plugin System
 
-**Domain:** Devcontainer Config Management System
-**Researched:** 2026-02-14
-**Confidence:** MEDIUM (based on existing codebase analysis, devcontainer lifecycle knowledge, and infrastructure patterns from training data)
+**Domain:** Claude Code Sandbox installation script enhancement
+**Researched:** 2026-02-15
+**Confidence:** HIGH
 
-## Recommended Architecture
+## Executive Summary
 
-The devcontainer config management system should follow a **Source-of-Truth → Template Hydration → Runtime Config** pattern with clear component boundaries and lifecycle stage responsibilities.
+The plugin system integrates into the existing `install-agent-config.sh` architecture by adding four new processing stages between template hydration and GSD installation. The critical insight is that plugins must be processed AFTER settings.local.json is generated from the template but BEFORE final settings enforcement, enabling proper accumulation and merging of hook registrations, environment variables, and MCP server definitions.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        SOURCE OF TRUTH                          │
-│  (Version controlled, user-facing, declarative)                 │
-├─────────────────────────────────────────────────────────────────┤
-│  config.json (committed)        secrets.json (gitignored)       │
-│  - Firewall domains             - Claude credentials            │
-│  - MCP server definitions       - OpenAI API key                │
-│  - Langfuse endpoint            - Google API key                │
-│  - Projects/repos               - Langfuse secret key           │
-│  - Agent model preferences      - GitHub tokens                 │
-│  - VS Code settings             - MCP server credentials        │
-│                                                                  │
-│  agent-config/ (committed)                                      │
-│  - settings.json (template with {{placeholders}})               │
-│  - skills/                                                      │
-│  - hooks/                                                       │
-│  - commands/                                                    │
-└──────────────┬──────────────────────────────────────────────────┘
-               │
-               │ postCreateCommand: install-agent-config.sh
-               │ (reads both config files, merges, hydrates templates)
-               │
-               ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    HYDRATION & GENERATION                        │
-│  (One-time transformation at container creation)                │
-├─────────────────────────────────────────────────────────────────┤
-│  install-agent-config.sh orchestrates:                          │
-│                                                                  │
-│  1. Read config.json + secrets.json                             │
-│  2. Generate firewall-domains.conf                              │
-│     (config.firewall.extra_domains → .devcontainer/)            │
-│  3. Hydrate settings template                                   │
-│     (agent-config/settings.json + placeholders → runtime)       │
-│  4. Generate MCP configs                                        │
-│     (config.mcp_servers + secrets → infra/mcp/mcp.json)         │
-│  5. Copy static assets                                          │
-│     (skills/, hooks/, commands/ → ~/.claude/)                   │
-│  6. Generate .vscode/settings.json                              │
-│     (config.projects → git.scanRepositories)                    │
-└──────────────┬──────────────────────────────────────────────────┘
-               │
-               │ Files written to disk
-               │
-               ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                       RUNTIME CONFIG                             │
-│  (Read by services at runtime, never edited by users)           │
-├─────────────────────────────────────────────────────────────────┤
-│  ~/.claude/settings.json        Hydrated from template          │
-│  ~/.claude/skills/              Copied from agent-config/       │
-│  ~/.claude/hooks/               Copied from agent-config/       │
-│  ~/.claude/commands/            Merged (user + GSD)             │
-│  .devcontainer/firewall-domains.conf  Generated                 │
-│  .vscode/settings.json          Generated                       │
-│  infra/mcp/mcp.json             Generated (with secrets)        │
-│  /workspace/.mcp.json           Generated (runtime, gitignored) │
-└──────────────┬──────────────────────────────────────────────────┘
-               │
-               │ postStartCommand: init-firewall.sh, mcp-setup
-               │
-               ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    RUNTIME SERVICES                              │
-│  (Services start and consume runtime config)                    │
-├─────────────────────────────────────────────────────────────────┤
-│  - init-firewall.sh reads firewall-domains.conf                 │
-│  - mcp-setup generates .mcp.json from infra/mcp/mcp.json        │
-│  - Claude Code reads ~/.claude/settings.json                    │
-│  - Docker Compose reads infra/.env (generated separately)       │
-└─────────────────────────────────────────────────────────────────┘
-```
+The existing architecture follows a linear pipeline pattern with minimal state passing. Plugin integration extends this pattern with accumulator variables (`PLUGIN_HOOKS`, `PLUGIN_ENV`, `PLUGIN_MCP`) that collect registrations across all enabled plugins before merging into the final configuration files.
 
-### Component Boundaries
+## Current Architecture Analysis
 
-| Component | Responsibility | Owns | Communicates With |
-|-----------|---------------|------|-------------------|
-| **config.json** | Master non-secret configuration source | Firewall domains, MCP server defs (structure only), Langfuse endpoint, projects list, agent preferences, VS Code settings | Install script (read), User (edit) |
-| **secrets.json** | Master credential storage | Claude auth, OpenAI key, Google key, Langfuse keys, MCP server tokens, GitHub PATs | Install script (read), save-secrets helper (write), User (manual edit) |
-| **agent-config/** | Agent behavior configuration source | Skills, hooks, commands, settings template (with {{placeholders}}) | Install script (read/copy), User (edit) |
-| **install-agent-config.sh** | Config orchestrator | Reads sources, hydrates templates, generates runtime configs, copies assets | config.json, secrets.json, agent-config/, runtime destinations |
-| **Runtime configs** | Service-consumable configuration | Hydrated settings.json, firewall-domains.conf, .vscode/settings.json, mcp.json | Services (read), Install script (write), NEVER user (readonly) |
-| **init-firewall.sh** | Firewall service bootstrap | Firewall rules from firewall-domains.conf | firewall-domains.conf (read), iptables (write) |
-| **mcp-setup** | MCP runtime config generator | /workspace/.mcp.json from infra/mcp/mcp.json | infra/mcp/mcp.json (read), Claude Code (via .mcp.json) |
-| **save-secrets** | Credential extraction helper | Reverse flow: captures live credentials back into secrets.json | Claude Code runtime config (read), secrets.json (write) |
-| **infra/.env** | Infrastructure secret storage | Docker Compose stack credentials (separate from agent secrets) | generate-env.sh (write), docker-compose.yml (read) |
-
-### Data Flow
+### System Overview
 
 ```
-USER EDIT FLOW (most common):
-1. User edits config.json or secrets.json or agent-config/*
-2. User rebuilds devcontainer (triggers postCreateCommand)
-3. install-agent-config.sh runs
-4. Runtime configs regenerated
-5. postStartCommand services start with new config
-
-CREDENTIAL CAPTURE FLOW (save-secrets):
-1. User configures Claude Code via CLI (e.g., `claude auth`)
-2. Live credentials stored in ~/.claude/settings.json or OS keyring
-3. User runs save-secrets helper
-4. Helper extracts credentials from runtime locations
-5. Helper writes to secrets.json
-6. Next rebuild: secrets.json → install script → runtime configs
-
-INFRASTRUCTURE SECRETS FLOW (separate):
-1. User runs infra/scripts/generate-env.sh
-2. Script generates random passwords/keys
-3. Writes to infra/.env (gitignored)
-4. docker-compose.yml reads .env at stack startup
-5. (Never touches config.json/secrets.json — isolated subsystem)
-
-CONFIG HYDRATION FLOW (template engine):
-1. install-agent-config.sh loads config.json + secrets.json into memory
-2. Reads agent-config/settings.json (contains {{LANGFUSE_SECRET_KEY}}, etc.)
-3. Regex replace: {{KEY}} → secrets.json[path.to.key]
-4. If key missing: placeholder → empty string + warning logged
-5. Writes hydrated output to ~/.claude/settings.json
-6. Same pattern for MCP server env vars
-
-FILE GENERATION FLOW (derived configs):
-1. firewall-domains.conf:
-   - Core domains (hardcoded: anthropic.com, github.com, npmjs.org)
-   - + config.firewall.extra_domains[]
-   - Written as newline-delimited list
-2. .vscode/settings.json:
-   - git.scanRepositories = config.projects[].path
-   - Other VS Code settings merged in
-3. infra/mcp/mcp.json:
-   - config.mcp_servers structure copied
-   - env vars hydrated from secrets.json
-   - Persisted for mcp-setup to consume
+┌─────────────────────────────────────────────────────────────┐
+│              Configuration Loading (Lines 39-77)             │
+│  ┌─────────────────┐         ┌──────────────────┐           │
+│  │  config.json    │         │  secrets.json    │           │
+│  │  (optional)     │         │  (optional)      │           │
+│  └────────┬────────┘         └────────┬─────────┘           │
+│           │                           │                     │
+│           └───────────┬───────────────┘                     │
+│                       ↓                                     │
+├─────────────────────────────────────────────────────────────┤
+│         Artifact Generation (Lines 82-219)                   │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │
+│  │ Firewall conf │  │ VS Code       │  │ Codex config  │   │
+│  │ (domains)     │  │ settings.json │  │ config.toml   │   │
+│  └───────────────┘  └───────────────┘  └───────────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│     Asset Copying + Template Hydration (Lines 221-246)      │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐    │
+│  │ Copy skills │  │ Copy hooks  │  │ Hydrate settings │    │
+│  │ (221-226)   │  │ (229-235)   │  │ template (238)   │    │
+│  └─────────────┘  └─────────────┘  └──────────────────┘    │
+├─────────────────────────────────────────────────────────────┤
+│        Credential Restoration (Lines 248-315)                │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │
+│  │ Claude creds  │  │ Codex creds   │  │ Git identity  │   │
+│  └───────────────┘  └───────────────┘  └───────────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│         MCP + Infrastructure Setup (Lines 317-381)           │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ Generate    │  │ Generate     │  │ Detect unresolved│   │
+│  │ .mcp.json   │  │ infra/.env   │  │ placeholders     │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│       GSD Installation + Final Enforcement (Lines 383-408)   │
+│  ┌─────────────┐                                             │
+│  │ Install GSD │  →  Enforce final settings.json values     │
+│  │ (npx)       │      (bypassPermissions, opus, high effort) │
+│  └─────────────┘                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Patterns to Follow
+### Current Component Responsibilities
 
-### Pattern 1: Declarative Source Files
-**What:** User-facing config is declarative JSON. No imperative scripts in the source-of-truth layer.
-**When:** Always for user-edited configuration.
-**Example:**
+| Component | Responsibility | Implementation |
+|-----------|----------------|----------------|
+| Config loader (39-77) | Read and validate config.json + secrets.json, extract values | `jq` for JSON parsing, bash for control flow |
+| Firewall generator (82-161) | Build allow-list from core + configured + detected domains | String concatenation, `jq` for array extraction |
+| VS Code settings (163-192) | Generate `.vscode/settings.json` with git scan paths | `jq` for JSON generation, auto-detection from filesystem |
+| Codex config (201-219) | Generate `~/.codex/config.toml` with model selection | Bash heredoc, string interpolation |
+| Skills copier (221-226) | Copy `agent-config/skills/*` → `~/.claude/skills/` | `cp -r`, recursive directory copy |
+| Hooks copier (229-235) | Copy `agent-config/hooks/*` → `~/.claude/hooks/` | `cp`, flat file copy |
+| Template hydrator (238-246) | Replace `{{PLACEHOLDER}}` tokens in settings.json.template | `sed` substitution (inline replacement) |
+| Credential restorer (248-315) | Extract credentials from secrets.json, write to runtime locations | `jq` extraction, JSON file writes |
+| MCP generator (317-351) | Build `.mcp.json` from enabled server templates | `jq` merging, template hydration with `sed` |
+| Infrastructure setup (354-365) | Generate `infra/.env` if secrets present | External `langfuse-setup` command |
+| Placeholder detector (368-381) | Find unresolved `{{TOKENS}}`, replace with empty string | `grep -oP`, `sed -i` inline replacement |
+| GSD installer (383-401) | Install GSD framework via npx | External npm command |
+| Settings enforcer (403-408) | Force specific values into settings.json after GSD modifies it | `jq` mutation, file replacement |
+
+### Key Architectural Patterns
+
+**Pattern 1: Linear Pipeline with Minimal State**
+
+The script follows a strict sequential execution model where each stage completes before the next begins. State is passed via environment variables and intermediate files, not bash variables (except for counters/status).
+
+**Pattern 2: Optional Configuration with Defaults**
+
+Every configuration source (config.json, secrets.json) is optional. The script uses `jq -r '.path // "default"'` extensively to provide fallbacks.
+
+**Pattern 3: Template Hydration via sed**
+
+Placeholder replacement happens in two places:
+1. **settings.json.template (line 239-242)**: Three specific tokens (`LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`)
+2. **MCP templates (line 330)**: One token (`MCP_GATEWAY_URL`)
+
+Both use `sed` for inline string replacement, not `jq`, because templates may be partially JSON (settings) or pure JSON (MCP).
+
+**Pattern 4: Non-Destructive Overwrites**
+
+The script is designed to be re-runnable. Files are regenerated on each run, but certain directories (like GSD) are protected from re-installation if they already exist.
+
+### Current Data Flow
+
+```
+config.json + secrets.json
+    ↓ (jq extraction)
+Variables: LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, MCP_GATEWAY_URL
+    ↓
+settings.json.template
+    ↓ (sed hydration)
+settings.local.json (generated, contains env + hooks from template)
+    ↓
+settings.json (seeded with permissions structure)
+    ↓ (GSD modifies this file)
+settings.json (final — enforced values overwrite GSD changes)
+```
+
+**Critical observation:** `settings.local.json` is generated from the template and never modified again. `settings.json` is the file that gets modified by GSD and then enforced at the end. The two files serve different purposes:
+- `settings.local.json`: User-specific configuration (env vars, hooks)
+- `settings.json`: Application state (permissions, model selection, effort level)
+
+### Current Hook Registration Mechanism
+
+In `settings.json.template`:
 ```json
-// config.json — declarative
 {
-  "firewall": {
-    "extra_domains": ["api.cloudflare.com", "storage.googleapis.com"]
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/node/.claude/hooks/langfuse_hook.py"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
-Not:
-```bash
-# BAD: imperative script as source-of-truth
-echo "api.cloudflare.com" >> firewall-domains.conf
+
+This structure is **nested twice**: `hooks.Stop` is an array containing objects with a `hooks` property, which contains the actual hook definitions. This is critical for understanding how plugin hooks must be merged.
+
+## Plugin System Integration Points
+
+### New Components Required
+
+| Component | Responsibility | Insert After | Insert Before |
+|-----------|----------------|--------------|---------------|
+| Standalone commands copier | Copy `agent-config/commands/*.md` → `~/.claude/commands/` (non-destructive) | Hooks copy (line 235) | Template hydration (line 238) |
+| Plugin processor | Iterate plugins, check enabled status, copy files, accumulate registrations | Template hydration (line 246) | Credential restoration (line 248) |
+| Hook merger | Merge accumulated plugin hooks into `settings.local.json` | Plugin processor | MCP generation (line 317) |
+| Env merger | Merge accumulated plugin env vars into `settings.local.json` | Hook merger | MCP generation (line 317) |
+| MCP merger | Merge accumulated plugin MCP servers into `.mcp.json` | Env merger | **AFTER** MCP generation (line 351) |
+
+### Critical Insertion Point Analysis
+
+**Why plugins MUST be processed after template hydration:**
+
+1. `settings.local.json` must exist before merging plugin hooks/env into it
+2. Template hydration creates the base structure with infrastructure env vars (LANGFUSE_*, etc.)
+3. Plugin hooks/env are **additive** — they merge into existing structure, not replace
+
+**Why plugin MCP merge MUST happen after MCP generation (line 351):**
+
+The existing MCP generation builds `.mcp.json` from `config.json` enabled server templates. Plugin MCP servers are additional to these, so plugin merge must happen after the base `.mcp.json` exists. Otherwise, plugin MCP servers would be overwritten.
+
+**Current tech debt identified (from spec):**
+
+Line 338 in current script: `echo "$MCP_JSON" > "$CLAUDE_DIR/.mcp.json"` — this **overwrites** the file. Plugin MCP merge cannot happen before this line or it will be lost.
+
+### Recommended Installation Order (Modified)
+
+```
+1.  Read config.json + secrets.json (existing: lines 39-77)
+2.  Generate firewall-domains.conf (existing: lines 82-161)
+3.  Generate .vscode/settings.json (existing: lines 163-192)
+4.  Generate Codex config.toml (existing: lines 201-219)
+5.  Create ~/.claude/ directory structure (existing: lines 194-199)
+6.  Copy standalone skills (existing: lines 221-226)
+7.  Copy standalone hooks (existing: lines 229-235)
+8.  **NEW: Copy standalone commands** → insert at line 236
+9.  Hydrate settings.json.template → settings.local.json (existing: line 238-246)
+10. Seed settings.json with permissions (existing: lines 248-253)
+11. **NEW: Process plugins (copy files, accumulate registrations)** → insert at line 247
+12. **NEW: Merge plugin hooks into settings.local.json** → after plugin processing
+13. **NEW: Merge plugin env vars into settings.local.json** → after hook merge
+14. Restore Claude credentials (existing: lines 255-286)
+15. Restore Codex credentials (existing: lines 288-301)
+16. Restore git identity (existing: lines 303-315)
+17. Generate MCP config from templates (existing: lines 317-351)
+18. **NEW: Merge plugin MCP servers into .mcp.json** → insert after line 351
+19. Generate infra/.env (existing: lines 354-365)
+20. Detect unresolved placeholders (existing: lines 368-381)
+21. Install GSD framework (existing: lines 383-401)
+22. Enforce settings.json final values (existing: lines 403-408)
+23. Print summary (existing: lines 410-423)
 ```
 
-**Why:** JSON is diff-friendly, mergeable, validatable with schema. Users can understand and edit it without shell scripting knowledge.
+## Data Flow Changes
 
-### Pattern 2: Template Hydration with {{PLACEHOLDERS}}
-**What:** Runtime config files are templates with {{KEY}} placeholders replaced by install script.
-**When:** When a config file needs both static structure (committed) and dynamic secrets (gitignored).
-**Example:**
+### New Accumulator Variables
+
+```bash
+# Initialized after template hydration, before plugin processing
+PLUGIN_HOOKS='{}'    # JSON object: { "Stop": [...], "SessionStart": [...] }
+PLUGIN_ENV='{}'      # JSON object: { "VAR_NAME": "value", ... }
+PLUGIN_MCP='{}'      # JSON object: { "server-name": { "command": "...", ... }, ... }
+PLUGIN_COUNT=0       # Integer counter for summary
+COMMANDS_COUNT=0     # Integer counter for summary
+```
+
+These variables accumulate during plugin iteration (step 11) and are consumed by merge steps (12-13, 18).
+
+### Plugin Processing Flow
+
+```
+for each plugin_dir in agent-config/plugins/*/
+    ↓
+Check config.json: is plugin enabled? (default: true)
+    ↓ (if disabled: skip)
+Validate plugin.json exists and is valid JSON
+    ↓
+Copy plugin files to runtime locations:
+  - plugin/skills/*     → ~/.claude/skills/
+  - plugin/hooks/*      → ~/.claude/hooks/
+  - plugin/agents/*.md  → ~/.claude/agents/ (skip gsd-*.md)
+  - plugin/commands/*.md → ~/.claude/commands/
+    ↓
+Accumulate plugin.json registrations:
+  - plugin.json → hooks   → PLUGIN_HOOKS (jq merge)
+  - plugin.json → env     → PLUGIN_ENV (jq merge)
+  - config.json override  → PLUGIN_ENV (jq merge, takes precedence)
+  - plugin.json → mcp_servers → PLUGIN_MCP (jq merge)
+    ↓
+Increment PLUGIN_COUNT
+    ↓
+Next plugin
+```
+
+### Hook Merging Data Flow
+
+**Input:**
+- `settings.local.json` (existing, generated from template)
+- `PLUGIN_HOOKS` (accumulated JSON object)
+
+**Current template structure (from line 15-26 of settings.json.template):**
 ```json
-// agent-config/settings.json (template, committed)
 {
-  "environmentVariables": {
-    "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}",
-    "LANGFUSE_PUBLIC_KEY": "{{LANGFUSE_PUBLIC_KEY}}"
-  }
-}
-
-// secrets.json (gitignored)
-{
-  "langfuse": {
-    "secret_key": "sk-lf-abc123",
-    "public_key": "pk-lf-xyz789"
-  }
-}
-
-// Result: ~/.claude/settings.json (runtime, generated)
-{
-  "environmentVariables": {
-    "LANGFUSE_SECRET_KEY": "sk-lf-abc123",
-    "LANGFUSE_PUBLIC_KEY": "pk-lf-xyz789"
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/node/.claude/hooks/langfuse_hook.py"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
-**Implementation (bash/jq):**
-```bash
-# Load secrets
-LANGFUSE_SECRET=$(jq -r '.langfuse.secret_key // ""' secrets.json)
-LANGFUSE_PUBLIC=$(jq -r '.langfuse.public_key // ""' secrets.json)
-
-# Hydrate template
-sed -e "s|{{LANGFUSE_SECRET_KEY}}|$LANGFUSE_SECRET|g" \
-    -e "s|{{LANGFUSE_PUBLIC_KEY}}|$LANGFUSE_PUBLIC|g" \
-    agent-config/settings.json > ~/.claude/settings.json
-```
-
-### Pattern 3: Fail-Safe with Warnings
-**What:** If config.json or secrets.json is missing or malformed, use sensible defaults and warn. Never fail the build.
-**When:** All config reads in install-agent-config.sh.
-**Example:**
-```bash
-if [ ! -f config.json ]; then
-  echo "⚠️  config.json not found. Using defaults."
-  EXTRA_DOMAINS=()
-else
-  EXTRA_DOMAINS=$(jq -r '.firewall.extra_domains[]' config.json 2>/dev/null || echo "")
-fi
-
-if [ ! -f secrets.json ]; then
-  echo "⚠️  secrets.json not found. Credential placeholders will be empty."
-  echo "    Run save-secrets after configuring Claude Code."
-fi
-```
-
-**Why:** Missing config shouldn't brick the container. New users can boot the container, configure manually, then save secrets for next rebuild. Experienced users can populate config before first boot.
-
-### Pattern 4: Idempotent Install Script
-**What:** install-agent-config.sh can run multiple times safely. Overwrites are intentional (regenerating from source).
-**When:** postCreateCommand (runs once), manual re-runs for testing.
-**Example:**
-```bash
-# Always safe to run
-rm -rf ~/.claude/skills/*
-cp -r agent-config/skills/* ~/.claude/skills/
-
-# Generate configs (overwrite existing)
-generate_firewall_domains > .devcontainer/firewall-domains.conf
-hydrate_settings > ~/.claude/settings.json
-```
-
-**Why:** Rebuilding the container should always produce a clean, known-good state. No drift from accumulated manual edits.
-
-### Pattern 5: Separate Infrastructure Secrets
-**What:** infra/.env (Docker Compose stack credentials) is generated independently from config.json/secrets.json.
-**When:** Initial setup of Langfuse/Postgres/Redis/etc.
-**Example:**
-```bash
-# infra/scripts/generate-env.sh
-POSTGRES_PASSWORD=$(openssl rand -hex 24)
-echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
-```
-
-**Why:** Langfuse stack credentials are infrastructure-level (database passwords, encryption keys). Agent secrets are application-level (API keys for external services). Mixing them in one file creates confusion. Infrastructure secrets are generated once and rarely change. Agent secrets are edited frequently as users add/remove services.
-
-### Pattern 6: Reverse Flow for Credential Capture
-**What:** A save-secrets helper extracts live credentials from runtime locations back into secrets.json.
-**When:** After user configures Claude Code via `claude auth` or similar interactive flows.
-**Example:**
-```bash
-#!/bin/bash
-# save-secrets — extracts credentials from runtime and saves to secrets.json
-
-# Read Claude auth from OS keyring or settings.json
-CLAUDE_CREDS=$(claude config get credentials 2>/dev/null || echo "")
-
-# Read current secrets.json (or create new)
-if [ -f secrets.json ]; then
-  SECRETS=$(cat secrets.json)
-else
-  SECRETS='{}'
-fi
-
-# Merge new credentials
-SECRETS=$(echo "$SECRETS" | jq --arg creds "$CLAUDE_CREDS" \
-  '.claude.credentials = $creds')
-
-# Write back
-echo "$SECRETS" | jq . > secrets.json
-echo "✓ Saved Claude credentials to secrets.json"
-```
-
-**Why:** Users shouldn't manually copy-paste credentials. Capture from the official source (Claude CLI, OS keyring) to avoid typos and format errors.
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Editing Runtime Configs Directly
-**What:** User edits ~/.claude/settings.json or .devcontainer/firewall-domains.conf directly.
-**Why bad:** Next container rebuild overwrites their changes. All manual edits lost.
-**Instead:** Edit config.json, secrets.json, or agent-config/*, then rebuild. Runtime configs are read-only outputs of the install script.
-
-**Detection:** Git tracking of generated files (e.g., if ~/.claude/settings.json shows up in git status).
-**Prevention:** Document clearly: "NEVER EDIT. Generated from config.json + secrets.json."
-
-### Anti-Pattern 2: Hardcoding Secrets in config.json
-**What:** Putting API keys directly in config.json instead of using {{PLACEHOLDER}} + secrets.json.
-**Why bad:** Secrets get committed to git. Security risk.
-**Instead:**
+**Plugin hook format (from spec):**
 ```json
-// config.json (committed) — structure only
 {
-  "mcp_servers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_TOKEN": "{{GITHUB_TOKEN}}" }
+  "Stop": [
+    {
+      "type": "command",
+      "command": "python3 ~/.claude/hooks/my-hook.py"
     }
-  }
-}
-
-// secrets.json (gitignored) — credentials only
-{
-  "mcp_tokens": {
-    "GITHUB_TOKEN": "ghp_abc123xyz"
-  }
-}
-```
-
-**Detection:** Grep config.json for patterns like `".*key":\s*"[a-zA-Z0-9]{20,}"` (looks like a real token).
-**Prevention:** Validation step in install script that warns if config.json contains suspicious patterns.
-
-### Anti-Pattern 3: Scattering Config Across Multiple Scripts
-**What:** firewall-domains.conf managed in init-firewall.sh, MCP config in mcp-setup, VS Code settings in devcontainer.json.
-**Why bad:** Users must hunt through multiple files to change one logical setting (e.g., "add a new project").
-**Instead:** Single config.json → install-agent-config.sh distributes values to all destinations.
-
-**Example of centralization:**
-```json
-// config.json — ONE place to add a project
-{
-  "projects": [
-    { "path": "gitprojects/new-project", "label": "New Project" }
   ]
 }
 ```
-Install script updates:
-- .vscode/settings.json → git.scanRepositories
-- (Future) firewall-domains.conf if project has custom domains
-- (Future) Per-project Claude settings
 
-### Anti-Pattern 4: Stateful Install Script
-**What:** Install script checks "did I already do X?" and skips steps.
-**Why bad:** Partial failures leave container in inconsistent state. Hard to debug.
-**Instead:** Always regenerate everything. Idempotent operations.
+**Critical merging challenge:** The template uses a nested structure (`hooks.Stop[].hooks[]`) while plugins declare a flat structure (`Stop[]`). The merge logic must:
 
-**Bad:**
+1. Extract existing template hooks from `settings.local.json`
+2. For each event in `PLUGIN_HOOKS`, append to the array
+3. Maintain the nested structure expected by Claude Code
+
+**Correct jq merge logic:**
+
 ```bash
-if [ ! -f ~/.claude/settings.json ]; then
-  hydrate_settings > ~/.claude/settings.json
+# This handles both existing events (append) and new events (create)
+jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
+  ($plugin_hooks | to_entries) as $new_hooks |
+  .hooks = (
+    .hooks // {} |
+    reduce $new_hooks[] as $entry (
+      .;
+      if has($entry.key) then
+        # Event exists in template — append to first element's hooks array
+        .[$entry.key][0].hooks += $entry.value
+      else
+        # New event from plugin — create structure
+        .[$entry.key] = [{"hooks": $entry.value}]
+      end
+    )
+  )
+' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+```
+
+### Environment Variable Merging Data Flow
+
+**Input:**
+- `settings.local.json` (existing)
+- `PLUGIN_ENV` (accumulated, with config.json overrides already applied)
+
+**Process:**
+1. Read existing `settings.local.json`
+2. Add all keys from `PLUGIN_ENV` to `.env` object
+3. Write back to file
+
+**jq logic:**
+
+```bash
+jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' \
+    "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
+    && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+```
+
+This is simple additive merge. If a key exists in both template and plugin, plugin wins (which is correct behavior).
+
+### MCP Server Merging Data Flow
+
+**Input:**
+- `.mcp.json` (existing, generated from templates at line 338)
+- `PLUGIN_MCP` (accumulated, needs {{TOKEN}} hydration)
+
+**Critical ordering constraint:** This MUST happen after line 351 (MCP generation complete).
+
+**Process:**
+1. Hydrate `{{PLACEHOLDER}}` tokens in `PLUGIN_MCP` from secrets.json
+2. Read existing `.mcp.json`
+3. Merge `PLUGIN_MCP` into `.mcpServers` object
+4. Write back to file
+
+**Hydration challenge:** Plugin MCP servers may use `{{TOKENS}}` that aren't in the standard set (LANGFUSE_*, MCP_GATEWAY_URL). The spec proposes generic hydration (line 370-372), but this is incomplete.
+
+**Recommended approach:**
+
+```bash
+# Extract all {{TOKENS}} from PLUGIN_MCP
+TOKENS=$(echo "$PLUGIN_MCP" | grep -oP '\{\{[A-Z_]+\}\}' | sort -u)
+
+# For each token, look up in secrets.json and replace
+HYDRATED_MCP="$PLUGIN_MCP"
+for TOKEN in $TOKENS; do
+    # Extract token name (remove {{ }})
+    TOKEN_NAME=$(echo "$TOKEN" | sed 's/{{//g; s/}}//g')
+
+    # Look up value in secrets.json (search all nested paths)
+    # Use jq to recursively search for the key
+    TOKEN_VALUE=$(jq -r --arg key "$TOKEN_NAME" '
+        .. | objects | select(has($key)) | .[$key] // ""
+    ' "$SECRETS_FILE" 2>/dev/null | head -1)
+
+    # Replace in MCP JSON
+    if [ -n "$TOKEN_VALUE" ]; then
+        HYDRATED_MCP=$(echo "$HYDRATED_MCP" | sed "s|$TOKEN|$TOKEN_VALUE|g")
+    else
+        echo "[install] WARNING: Token $TOKEN in plugin MCP server not found in secrets.json"
+        # Leave as empty string (handled by placeholder detector later)
+        HYDRATED_MCP=$(echo "$HYDRATED_MCP" | sed "s|$TOKEN||g")
+    fi
+done
+
+# Merge into .mcp.json
+jq --argjson plugin_mcp "$HYDRATED_MCP" '.mcpServers += $plugin_mcp' \
+    "$MCP_FILE" > "$MCP_FILE.tmp" \
+    && mv "$MCP_FILE.tmp" "$MCP_FILE"
+```
+
+## Architectural Patterns for Plugin System
+
+### Pattern 1: Accumulator-Then-Merge
+
+**What:** Process all plugins to accumulate registrations in bash variables (as JSON strings), then merge all at once after processing completes.
+
+**Why:** Prevents multiple file writes during plugin iteration. Each merge operation reads → modifies → writes a file, which is expensive and error-prone. Accumulating first allows single-pass merging.
+
+**Trade-offs:**
+- PRO: Faster, fewer file I/O operations
+- PRO: Easier to validate accumulated JSON before merging
+- CON: Requires bash variables to hold potentially large JSON strings
+- CON: If one plugin has invalid JSON, detection happens late (during accumulation, not iteration)
+
+**Implementation:**
+```bash
+PLUGIN_HOOKS='{}'
+
+for plugin_dir in agent-config/plugins/*/; do
+    MANIFEST="$plugin_dir/plugin.json"
+    # Accumulate hooks using jq merge
+    PLUGIN_HOOKS=$(jq -s '
+        .[0] as $acc |
+        .[1].hooks // {} |
+        to_entries |
+        reduce .[] as $entry (
+            $acc;
+            .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
+        )
+    ' <(echo "$PLUGIN_HOOKS") "$MANIFEST")
+done
+
+# After loop: merge once
+jq --argjson hooks "$PLUGIN_HOOKS" '.hooks = ...' settings.local.json
+```
+
+### Pattern 2: Config Override Precedence
+
+**What:** Three-tier precedence for plugin configuration:
+1. Plugin defaults (from `plugin.json`)
+2. Config.json overrides (from `config.json → plugins → {plugin-name} → env`)
+3. Accumulated result used in merge
+
+**Why:** Allows users to customize plugin behavior without editing plugin files.
+
+**Implementation:**
+```bash
+# 1. Get plugin defaults
+PLUGIN_ENV_DEFAULTS=$(jq -r '.env // {}' "$MANIFEST")
+
+# 2. Get config.json overrides for this plugin
+PLUGIN_ENV_OVERRIDES=$(jq -r --arg name "$plugin_name" \
+    '.plugins[$name].env // {}' "$CONFIG_FILE")
+
+# 3. Merge (overrides win)
+PLUGIN_ENV=$(echo "$PLUGIN_ENV" "$PLUGIN_ENV_DEFAULTS" "$PLUGIN_ENV_OVERRIDES" | \
+    jq -s '.[0] * .[1] * .[2]')
+```
+
+### Pattern 3: Non-Destructive File Copying with GSD Protection
+
+**What:** When copying plugin files to runtime locations, protect GSD-owned paths from being overwritten.
+
+**Why:** GSD is installed last via npx and its files should never be replaced by plugin content (which runs earlier). GSD owns:
+- `~/.claude/commands/gsd/*`
+- `~/.claude/agents/gsd-*.md`
+
+**Implementation:**
+```bash
+# For plugin commands
+for cmd_file in "$plugin_dir/commands/"*.md; do
+    [ -f "$cmd_file" ] || continue
+    cmd_name=$(basename "$cmd_file")
+
+    # Skip if file is in gsd directory or is a gsd- prefixed agent
+    if [[ "$cmd_name" == "gsd" ]] || [[ "$cmd_name" =~ ^gsd- ]]; then
+        continue
+    fi
+
+    cp "$cmd_file" "$CLAUDE_DIR/commands/"
+done
+```
+
+### Pattern 4: Graceful Degradation on Invalid Plugin
+
+**What:** If a plugin has invalid `plugin.json` or missing manifest, skip the plugin entirely with a warning, but continue processing other plugins.
+
+**Why:** One broken plugin shouldn't break the entire installation.
+
+**Implementation:**
+```bash
+if [ ! -f "$MANIFEST" ]; then
+    echo "[install] WARNING: Plugin '$plugin_name' has no plugin.json — skipping"
+    continue
 fi
-# Problem: If user deletes file, script won't regenerate
+
+if ! validate_json "$MANIFEST" "plugins/$plugin_name/plugin.json"; then
+    continue  # validate_json already printed error
+fi
 ```
 
-**Good:**
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Merging Plugin MCP Before Template MCP Generation
+
+**What people might do:** Insert plugin MCP merge before line 351 (MCP generation) because "plugins should be processed early"
+
+**Why it's wrong:** Line 338 overwrites `.mcp.json` with `echo "$MCP_JSON" > "$CLAUDE_DIR/.mcp.json"`. Any plugin MCP servers merged before this line will be lost.
+
+**Do this instead:** Always merge plugin MCP servers AFTER the base `.mcp.json` is written (after line 351).
+
+### Anti-Pattern 2: Using Simple Hook Array Concatenation
+
+**What people might do:**
 ```bash
-# Always regenerate (overwrite)
-hydrate_settings > ~/.claude/settings.json
+# WRONG — doesn't match Claude Code's expected structure
+jq '.hooks.Stop += $plugin_hooks' settings.local.json
 ```
 
-### Anti-Pattern 5: Mixing Infrastructure and Agent Secrets
-**What:** Putting Postgres password in secrets.json alongside Claude API key.
-**Why bad:** Different lifecycles. Infra secrets generated once and rarely change. Agent secrets edited frequently. Mixing them creates noise.
-**Instead:** infra/.env for Docker Compose stack. secrets.json for Claude/OpenAI/Google/MCP agents.
+**Why it's wrong:** Claude Code expects `hooks.Stop[].hooks[]` (nested arrays), not `hooks.Stop[]` (flat array). This would break hook execution.
 
-## Scalability Considerations
+**Do this instead:** Use the correct nested structure merge shown in "Hook Merging Data Flow" section.
 
-| Concern | Initial (1 user, 1 project) | Medium (1 user, 5 projects) | Large (team, 20+ projects) |
-|---------|-----------------------------|-----------------------------|----------------------------|
-| **Config complexity** | Single config.json with inline settings | Config grows but manageable in one file | Consider splitting: config.json references project-specific configs in gitprojects/*/project.json |
-| **Secret management** | Manual secrets.json editing | save-secrets helper essential | Secret manager integration (Vault, AWS Secrets Manager) instead of file-based |
-| **Build time** | <30s (install script runs fast) | Same (config size doesn't affect runtime much) | Optimize: cache npm packages, parallel asset copying |
-| **Runtime config drift** | Non-issue (single user rebuilds regularly) | Risk of users forgetting to rebuild after config edits | CI/CD check: "config.json changed → rebuild required" |
-| **MCP server count** | 2-3 servers (filesystem, github) | 5-10 servers (add databases, APIs) | Template generation helper for repetitive server defs |
-| **Firewall domain list** | ~10 extra domains | ~50 extra domains | Auto-discovery: parse package.json deps for known CDN domains |
+### Anti-Pattern 3: Modifying settings.json Instead of settings.local.json
 
-### Phase 1 (MVP) Focus
-- Core components: config.json, secrets.json, install-agent-config.sh
-- Template hydration for settings.json
-- Firewall domain generation
-- MCP config generation
-- Static asset copying (skills, hooks, commands)
+**What people might do:** Merge plugin hooks/env into `settings.json` because "that's the main config file"
 
-### Defer to Later Phases
-- save-secrets helper (can configure manually at first)
-- Per-project config overrides (start with global-only)
-- Secret manager integrations (file-based is fine for single user)
-- Advanced validation/schema checking (warnings are sufficient initially)
-- Config file splitting for large projects
+**Why it's wrong:**
+- `settings.json` is modified by GSD installer (line 391)
+- Final enforcement overwrites values in `settings.json` (line 405)
+- Plugin hooks/env would be lost or overwritten
 
-## Lifecycle Hook Responsibilities
+**Do this instead:** Always merge into `settings.local.json`, which is read by Claude Code alongside `settings.json` but never modified after generation.
 
-Devcontainer lifecycle hooks from official spec (confidence: MEDIUM — based on training data + existing devcontainer.json):
+### Anti-Pattern 4: Using Bash String Manipulation for JSON
 
-| Hook | Timing | Runs As | Responsibility in This Architecture |
-|------|--------|---------|-------------------------------------|
-| **postCreateCommand** | Once per container creation (after build) | Container user (node) | **install-agent-config.sh** — Read config.json + secrets.json, hydrate templates, generate all runtime configs, copy assets |
-| **postStartCommand** | Every container start/restart | Container user (node) | **init-firewall.sh** (requires sudo) — Apply firewall rules from generated firewall-domains.conf<br>**init-gsd.sh** — Install GSD framework<br>**mcp-setup** — Generate .mcp.json from infra/mcp/mcp.json |
-| **postAttachCommand** | Every time editor attaches | Container user (node) | (Not currently used — could run validation checks) |
-
-**Key insight:** Config generation (postCreateCommand) happens BEFORE service initialization (postStartCommand). This ensures firewall rules and MCP configs exist before services try to use them.
-
-**Ordering within postStartCommand:**
+**What people might do:**
 ```bash
-"postStartCommand": "sudo init-firewall.sh && init-gsd.sh && mcp-setup && docker compose -f infra/docker-compose.yml up -d"
-```
-1. init-firewall.sh FIRST (blocks network until rules applied)
-2. init-gsd.sh (installs GSD commands into ~/.claude/)
-3. mcp-setup (generates runtime .mcp.json)
-4. docker compose up (starts Langfuse stack — depends on network access)
-
-## Build Order Dependencies
-
-```
-LAYER 1 (No dependencies):
-├── config.json (user edits)
-├── secrets.json (user edits or save-secrets generates)
-└── agent-config/* (user edits)
-
-LAYER 2 (Depends on Layer 1):
-└── install-agent-config.sh execution
-    ├── Reads config.json + secrets.json
-    └── Outputs →
-
-LAYER 3 (Generated by Layer 2):
-├── .devcontainer/firewall-domains.conf
-├── ~/.claude/settings.json
-├── ~/.claude/skills/*
-├── ~/.claude/hooks/*
-├── ~/.claude/commands/*
-├── .vscode/settings.json
-└── infra/mcp/mcp.json
-
-LAYER 4 (Depends on Layer 3):
-└── postStartCommand services
-    ├── init-firewall.sh (reads firewall-domains.conf)
-    ├── mcp-setup (reads infra/mcp/mcp.json)
-    └── docker compose (reads infra/.env — separate flow)
-
-PARALLEL TRACK (Infrastructure secrets):
-infra/scripts/generate-env.sh → infra/.env → docker-compose.yml
-(Never touches config.json/secrets.json)
+# WRONG — fragile and breaks on special characters
+HOOKS="${HOOKS}, {\"type\": \"command\", \"command\": \"$cmd\"}"
 ```
 
-**Critical path for initial setup:**
-1. User creates config.json + secrets.json (or accepts defaults)
-2. User runs infra/scripts/generate-env.sh (one-time)
-3. User rebuilds devcontainer
-4. postCreateCommand: install-agent-config.sh generates runtime configs
-5. postStartCommand: Services start with generated configs
+**Why it's wrong:** Bash string manipulation can't safely handle JSON escaping, nested structures, or validation.
 
-**Critical path for config changes:**
-1. User edits config.json or secrets.json or agent-config/*
-2. User rebuilds devcontainer (or manually runs install-agent-config.sh for testing)
-3. Runtime configs regenerated
-4. (If firewall/MCP changed) Restart affected services
+**Do this instead:** Always use `jq` for JSON manipulation. It handles escaping, validation, and structure preservation correctly.
+
+## Integration Implementation Checklist
+
+### New Code Blocks Required
+
+**Block 1: Standalone Commands Copier** (insert after line 235)
+```bash
+# Copy standalone commands (non-destructive)
+COMMANDS_COUNT=0
+if [ -d "$AGENT_CONFIG_DIR/commands" ]; then
+    mkdir -p "$CLAUDE_DIR/commands"
+    for cmd_file in "$AGENT_CONFIG_DIR/commands"/*.md; do
+        [ -f "$cmd_file" ] || continue
+        cmd_name=$(basename "$cmd_file")
+        # Don't overwrite existing commands (e.g., GSD)
+        if [ ! -f "$CLAUDE_DIR/commands/$cmd_name" ]; then
+            cp "$cmd_file" "$CLAUDE_DIR/commands/"
+            COMMANDS_COUNT=$((COMMANDS_COUNT + 1))
+        fi
+    done
+    echo "[install] Copied $COMMANDS_COUNT standalone command(s)"
+fi
+```
+
+**Block 2: Plugin Processor** (insert after line 246, before credential restoration)
+```bash
+# Process plugins
+PLUGIN_COUNT=0
+PLUGIN_HOOKS='{}'
+PLUGIN_ENV='{}'
+PLUGIN_MCP='{}'
+
+if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
+    for plugin_dir in "$AGENT_CONFIG_DIR/plugins"/*/; do
+        [ -d "$plugin_dir" ] || continue
+        plugin_name=$(basename "$plugin_dir")
+
+        # Check if plugin is disabled in config.json
+        PLUGIN_ENABLED="true"
+        if [ -f "$CONFIG_FILE" ]; then
+            PLUGIN_ENABLED=$(jq -r --arg name "$plugin_name" \
+                '.plugins[$name].enabled // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
+        fi
+
+        if [ "$PLUGIN_ENABLED" = "false" ]; then
+            echo "[install] Plugin '$plugin_name': disabled in config.json, skipping"
+            continue
+        fi
+
+        # Validate plugin.json exists
+        MANIFEST="$plugin_dir/plugin.json"
+        if [ ! -f "$MANIFEST" ]; then
+            echo "[install] WARNING: Plugin '$plugin_name' has no plugin.json — skipping"
+            continue
+        fi
+
+        if ! validate_json "$MANIFEST" "plugins/$plugin_name/plugin.json"; then
+            continue
+        fi
+
+        # Copy plugin files to runtime locations
+        [ -d "$plugin_dir/skills" ] && cp -r "$plugin_dir/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
+        [ -d "$plugin_dir/hooks" ] && cp "$plugin_dir/hooks/"* "$CLAUDE_DIR/hooks/" 2>/dev/null || true
+
+        # Copy agents (skip GSD-owned files)
+        if [ -d "$plugin_dir/agents" ]; then
+            for agent_file in "$plugin_dir/agents/"*.md; do
+                [ -f "$agent_file" ] || continue
+                agent_name=$(basename "$agent_file")
+                if [[ ! "$agent_name" =~ ^gsd- ]]; then
+                    cp "$agent_file" "$CLAUDE_DIR/agents/"
+                fi
+            done
+        fi
+
+        # Copy commands (skip GSD directory)
+        if [ -d "$plugin_dir/commands" ]; then
+            for cmd_file in "$plugin_dir/commands/"*.md; do
+                [ -f "$cmd_file" ] || continue
+                cmd_name=$(basename "$cmd_file")
+                if [[ "$cmd_name" != "gsd" ]]; then
+                    cp "$cmd_file" "$CLAUDE_DIR/commands/"
+                fi
+            done
+        fi
+
+        # Accumulate hook registrations
+        MANIFEST_HOOKS=$(jq -r '.hooks // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+        if [ "$MANIFEST_HOOKS" != "{}" ]; then
+            PLUGIN_HOOKS=$(jq -s '
+                .[0] as $acc | .[1] | to_entries |
+                reduce .[] as $entry (
+                    $acc;
+                    .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
+                )
+            ' <(echo "$PLUGIN_HOOKS") <(echo "$MANIFEST_HOOKS") 2>/dev/null || echo "$PLUGIN_HOOKS")
+        fi
+
+        # Accumulate env vars (plugin.json defaults, config.json overrides)
+        MANIFEST_ENV=$(jq -r '.env // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+        CONFIG_ENV_OVERRIDE='{}'
+        if [ -f "$CONFIG_FILE" ]; then
+            CONFIG_ENV_OVERRIDE=$(jq -r --arg name "$plugin_name" \
+                '.plugins[$name].env // {}' "$CONFIG_FILE" 2>/dev/null || echo "{}")
+        fi
+        # Merge: accumulated < manifest defaults < config overrides win
+        PLUGIN_ENV=$(echo "$PLUGIN_ENV" "$MANIFEST_ENV" "$CONFIG_ENV_OVERRIDE" | \
+            jq -s '.[0] * .[1] * .[2]' 2>/dev/null || echo "$PLUGIN_ENV")
+
+        # Accumulate MCP servers
+        MANIFEST_MCP=$(jq -r '.mcp_servers // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+        if [ "$MANIFEST_MCP" != "{}" ]; then
+            PLUGIN_MCP=$(echo "$PLUGIN_MCP" "$MANIFEST_MCP" | \
+                jq -s '.[0] * .[1]' 2>/dev/null || echo "$PLUGIN_MCP")
+        fi
+
+        PLUGIN_COUNT=$((PLUGIN_COUNT + 1))
+        echo "[install] Plugin '$plugin_name': installed"
+    done
+
+    echo "[install] Processed $PLUGIN_COUNT plugin(s)"
+fi
+```
+
+**Block 3: Hook + Env Mergers** (immediately after Block 2)
+```bash
+# Merge plugin hooks into settings.local.json
+if [ "$PLUGIN_HOOKS" != "{}" ]; then
+    SETTINGS_FILE="$CLAUDE_DIR/settings.local.json"
+    if [ -f "$SETTINGS_FILE" ]; then
+        jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
+            ($plugin_hooks | to_entries) as $new_hooks |
+            .hooks = (
+                .hooks // {} |
+                reduce $new_hooks[] as $entry (
+                    .;
+                    if has($entry.key) then
+                        .[$entry.key][0].hooks += $entry.value
+                    else
+                        .[$entry.key] = [{"hooks": $entry.value}]
+                    end
+                )
+            )
+        ' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
+            && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        echo "[install] Merged plugin hooks into settings.local.json"
+    fi
+fi
+
+# Merge plugin env vars into settings.local.json
+if [ "$PLUGIN_ENV" != "{}" ]; then
+    SETTINGS_FILE="$CLAUDE_DIR/settings.local.json"
+    if [ -f "$SETTINGS_FILE" ]; then
+        jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' \
+            "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
+            && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        echo "[install] Merged plugin env vars into settings.local.json"
+    fi
+fi
+```
+
+**Block 4: MCP Merger** (insert after line 351, after existing MCP generation)
+```bash
+# Merge plugin MCP servers into .mcp.json
+if [ "$PLUGIN_MCP" != "{}" ]; then
+    MCP_FILE="$CLAUDE_DIR/.mcp.json"
+    if [ -f "$MCP_FILE" ]; then
+        # Hydrate {{PLACEHOLDER}} tokens from secrets.json
+        HYDRATED_MCP="$PLUGIN_MCP"
+        if [ -f "$SECRETS_FILE" ]; then
+            # Extract all {{TOKEN}} patterns
+            TOKENS=$(echo "$PLUGIN_MCP" | grep -oP '\{\{[A-Z_]+\}\}' | sort -u || true)
+            for TOKEN in $TOKENS; do
+                TOKEN_NAME=$(echo "$TOKEN" | sed 's/[{}]//g')
+                # Recursive search in secrets.json for this key
+                TOKEN_VALUE=$(jq -r --arg key "$TOKEN_NAME" '
+                    .. | objects | to_entries[] | select(.key == $key) | .value
+                ' "$SECRETS_FILE" 2>/dev/null | head -1 || echo "")
+
+                if [ -n "$TOKEN_VALUE" ]; then
+                    HYDRATED_MCP=$(echo "$HYDRATED_MCP" | sed "s|$TOKEN|$TOKEN_VALUE|g")
+                else
+                    echo "[install] WARNING: Token $TOKEN in plugin MCP config not found in secrets.json"
+                    HYDRATED_MCP=$(echo "$HYDRATED_MCP" | sed "s|$TOKEN||g")
+                fi
+            done
+        fi
+
+        jq --argjson plugin_mcp "$HYDRATED_MCP" '.mcpServers += $plugin_mcp' \
+            "$MCP_FILE" > "$MCP_FILE.tmp" \
+            && mv "$MCP_FILE.tmp" "$MCP_FILE"
+        echo "[install] Merged plugin MCP servers into .mcp.json"
+    fi
+fi
+```
+
+**Block 5: Summary Updates** (modify existing summary section at lines 410-423)
+```bash
+# Add to summary output (after existing lines)
+echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
+echo "[install] Plugins: $PLUGIN_COUNT plugin(s)"
+```
+
+### Modified Installation Order (Final)
+
+```
+Lines 39-77:    Read config.json + secrets.json
+Lines 82-161:   Generate firewall-domains.conf
+Lines 163-192:  Generate .vscode/settings.json
+Lines 201-219:  Generate Codex config.toml
+Lines 194-199:  Create ~/.claude/ directories
+Lines 221-226:  Copy standalone skills
+Lines 229-235:  Copy standalone hooks
+NEW Block 1:     Copy standalone commands
+Lines 238-246:  Hydrate settings.json.template → settings.local.json
+Lines 248-253:  Seed settings.json
+NEW Block 2:     Process plugins (copy files, accumulate registrations)
+NEW Block 3:     Merge plugin hooks + env into settings.local.json
+Lines 255-286:  Restore Claude credentials
+Lines 288-301:  Restore Codex credentials
+Lines 303-315:  Restore git identity
+Lines 317-351:  Generate .mcp.json from templates
+NEW Block 4:     Merge plugin MCP servers into .mcp.json
+Lines 354-365:  Generate infra/.env
+Lines 368-381:  Detect unresolved placeholders
+Lines 383-401:  Install GSD framework
+Lines 403-408:  Enforce settings.json final values
+Lines 410-423:  Print summary (+ NEW Block 5 additions)
+```
+
+## Tech Debt Resolution
+
+### Current Issue: MCP Generation Overwrites
+
+**Problem:** Line 338 uses `>` (overwrite) instead of merging.
+
+**Impact:** If we later want to support MCP servers defined directly in config.json (not via templates), they would be lost.
+
+**Resolution for plugin system:** Plugin MCP merge happens AFTER line 351, so it's safe. But the design is fragile.
+
+**Recommended improvement (future):** Change line 338 to build into a variable, then write once at the end:
+
+```bash
+# Instead of writing at line 338
+MCP_JSON_FINAL="$MCP_JSON"
+
+# After plugin merge
+MCP_JSON_FINAL=$(echo "$MCP_JSON_FINAL" | jq --argjson plugin "$PLUGIN_MCP" '.mcpServers += $plugin')
+
+# Write once
+echo "$MCP_JSON_FINAL" > "$CLAUDE_DIR/.mcp.json"
+```
+
+### Hook Structure Complexity
+
+**Problem:** The nested `hooks.Stop[0].hooks[]` structure is non-obvious and fragile. Why not `hooks.Stop[]` directly?
+
+**Likely reason:** Claude Code may support multiple hook "groups" per event, each with different execution policies (parallel, sequential, conditional). The outer array level allows for this.
+
+**Impact on plugin system:** Merge logic is more complex but still deterministic. Documented in this research.
+
+**Recommendation:** Accept the structure as-is. Attempting to "simplify" it would break compatibility with Claude Code's expectations.
 
 ## Sources
 
-**HIGH confidence (official/verified):**
-- Existing devcontainer.json structure (read from codebase)
-- Existing init-firewall.sh, mcp-setup, generate-env.sh scripts (read from codebase)
-- Opus refactor prompt (read from codebase — authoritative design doc)
+**HIGH Confidence — Direct examination:**
+- `/workspace/.devcontainer/install-agent-config.sh` (current implementation)
+- `/workspace/agent-config/settings.json.template` (hook structure)
+- `/workspace/.planning/nmc-plugin-spec.md` (plugin requirements)
+- `/workspace/config.json` (configuration schema)
 
-**MEDIUM confidence (training data + multiple sources):**
-- Devcontainer lifecycle hooks (postCreateCommand, postStartCommand) — standard VS Code Remote Containers pattern
-- Template hydration with sed/jq — common shell scripting pattern
-- JSON schema validation — standard practice for config management
+**HIGH Confidence — Tool behavior:**
+- `jq` manual and testing (JSON merging patterns)
+- `bash` parameter expansion and control flow (POSIX sh compatibility)
 
-**LOW confidence (training data only, needs validation):**
-- Specific Claude Code config file locations (~/.claude/settings.json) — inferred from existing scripts but should verify with official Claude Code docs
-- save-secrets implementation details — conceptual design, needs API research
-- Secret manager integrations for scale — general knowledge, not specific to this stack
+**MEDIUM Confidence — Inferred from code patterns:**
+- Claude Code's expected settings.json structure (inferred from template)
+- Hook execution model (inferred from nested structure)
 
-**Gaps to address in implementation phases:**
-- [ ] Verify exact Claude Code config file paths and schema
-- [ ] Research Codex CLI and Gemini CLI config file locations (not yet installed)
-- [ ] Test template hydration error handling (missing keys, malformed JSON)
-- [ ] Validate firewall refresh-firewall-dns.sh integration with new firewall-domains.conf
-- [ ] Confirm postStartCommand execution order guarantees (sequential or parallel?)
+---
+*Architecture research for: Claude Code Sandbox Plugin System Integration*
+*Researched: 2026-02-15*

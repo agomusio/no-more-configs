@@ -1,611 +1,668 @@
-# Devcontainer Configuration Refactor Pitfalls
+# Pitfalls Research
 
-**Domain:** Devcontainer configuration management on Windows 11/WSL2/Docker Desktop
-**Researched:** 2026-02-14
-**Confidence:** MEDIUM (based on training data + codebase analysis, WebSearch unavailable)
+**Domain:** Plugin system integration into existing bash install script (Claude Code Sandbox)
+**Researched:** 2026-02-15
+**Confidence:** HIGH
 
 ## Critical Pitfalls
 
-These mistakes cause container rebuilds to fail, data loss, or broken tooling requiring complete rework.
+### Pitfall 1: jq Array Overwriting Instead of Concatenation
 
-### Pitfall 1: Bind Mount Removal Without Secret Persistence Strategy
-
-**What goes wrong:** Removing `~/.claude` bind mount (line 49 in devcontainer.json) deletes access to Claude Code authentication tokens and settings. Container rebuilds lose authentication, breaking CLI sessions.
-
-**Why it happens:** Developers assume removing bind mount and switching to container-local config is just a "location change." They don't realize:
-- Claude Code stores auth tokens in `~/.claude/config.json` or `~/.claude/secrets.json`
-- Containers are ephemeral - data not in volumes or bind mounts vanishes on rebuild
-- Template-generated config ≠ persistent secrets
-
-**Consequences:**
-- Every container rebuild requires re-authentication
-- Langfuse API keys lost (currently in `settings.local.json`)
-- Project-specific settings lost
-- Hook configurations lost
-
-**Prevention:**
-1. **BEFORE removing bind mount:**
-   - Create `secrets.json.template` with placeholder values
-   - Document secret hydration process in install script
-   - Add `secrets.json` to `.gitignore` (check: already done for `.env`)
-   - Add `config.json` to git (non-secret project defaults)
-
-2. **Install script pattern:**
-   ```bash
-   # Check for secrets file
-   if [ ! -f "$CLAUDE_CONFIG_DIR/secrets.json" ]; then
-     echo "⚠️  No secrets.json found. Creating from template..."
-     cp "$CLAUDE_CONFIG_DIR/secrets.json.template" "$CLAUDE_CONFIG_DIR/secrets.json"
-     echo "❌ SETUP REQUIRED: Edit $CLAUDE_CONFIG_DIR/secrets.json with your credentials"
-     exit 1  # Fail loudly, don't silently continue with invalid config
-   fi
-   ```
-
-3. **Use Docker named volumes for persistent data:**
-   ```json
-   "mounts": [
-     "source=claude-code-secrets-${devcontainerId},target=/home/node/.claude/secrets,type=volume"
-   ]
-   ```
-
-**Detection:**
-- Warning sign: Container rebuild prompts for Claude Code login
-- Warning sign: Langfuse traces stop appearing after rebuild
-- Warning sign: GSD commands fail with "config not found"
-
-**Phase mapping:** Phase 1 (Config Migration) must solve this BEFORE removing bind mount.
-
----
-
-### Pitfall 2: Hard-Coded Path References in Aliases and Scripts
-
-**What goes wrong:** Scripts contain hard-coded paths to `claudehome/` that break when directory structure changes. Aliases in Dockerfile (lines 134-137) and scripts reference `/workspace/claudehome` directly.
+**What goes wrong:**
+When merging plugin hook registrations into `settings.local.json`, jq's default `*` merge operator **overwrites arrays instead of concatenating them**. If the settings template has a `Stop` hook for Langfuse, and a plugin also registers a `Stop` hook, the plugin's hook registration will completely replace the template's hook instead of appending to it. Result: the Langfuse hook disappears.
 
 **Why it happens:**
-- Convenience paths (claudey/claudeyr aliases) bake in directory structure
-- Scripts use relative paths from assumed locations
-- No indirection layer (env vars) between logical locations and physical paths
+jq's recursive merge (`*`) operator treats arrays as atomic values, not as collections to merge. When both the left and right operands have the same key with array values, the right-side array wins and replaces the left-side array entirely ([How to Recursively Merge JSON Objects and Concatenate Arrays with jq](https://www.codegenes.net/blog/jq-recursively-merge-objects-and-concatenate-arrays/)).
 
-**Consequences:**
-- Aliases broken: `claudey` and `claudeyr` stop working
-- Scripts fail: `setup-network-checks.sh` references `claudehome/langfuse-local`
-- Documentation becomes stale immediately
-- Incremental refactoring impossible (can't do add-then-wire-then-delete safely)
+**How to avoid:**
+Use custom merge logic that detects array types and concatenates them:
 
-**Prevention:**
-1. **Environment variable indirection:**
-   ```bash
-   # In devcontainer.json containerEnv
-   "LANGFUSE_STACK_DIR": "/workspace/infra/langfuse",
-   "CLAUDE_WORKSPACE": "/workspace"
-   ```
-
-2. **Alias refactoring pattern:**
-   ```bash
-   # BEFORE (brittle)
-   alias claudey='cd /workspace/claudehome && claude'
-
-   # AFTER (flexible)
-   alias claudey='cd ${CLAUDE_WORKSPACE:-/workspace} && claude'
-   ```
-
-3. **Script path resolution:**
-   ```bash
-   # BEFORE (assumes structure)
-   cd /workspace/claudehome/langfuse-local
-
-   # AFTER (discovers structure)
-   LANGFUSE_DIR="${LANGFUSE_STACK_DIR:-/workspace/infra/langfuse}"
-   if [ ! -d "$LANGFUSE_DIR" ]; then
-     echo "❌ Langfuse directory not found: $LANGFUSE_DIR"
-     exit 1
-   fi
-   cd "$LANGFUSE_DIR"
-   ```
-
-**Detection:**
-- Grep for hard-coded paths: `grep -r "/workspace/claudehome" .devcontainer/`
-- Check aliases: Source `.bashrc`/`.zshrc` and test `claudey` command
-- Test from non-root working directories: `cd gitprojects/adventure-alerts && mcp-setup`
-
-**Phase mapping:** Phase 0 (Preparation) - add env vars, update scripts BEFORE moving files.
-
----
-
-### Pitfall 3: GSD Framework Can't Find `.planning/` From Subdirectories
-
-**What goes wrong:** GSD commands fail when Claude Code sessions launch from `gitprojects/*/` subdirectories because framework looks for `.planning/` in current working directory, not repository root.
-
-**Why it happens:**
-- GSD assumes `.planning/` is in current directory or one level up
-- Git repository root ≠ Claude Code working directory
-- No upward directory traversal to find `.planning/`
-
-**Consequences:**
-- `/gsd:*` commands fail in subdirectory projects
-- Users forced to `cd /workspace` before running GSD commands
-- Breaks workflow isolation (adventure-alerts project can't be self-contained)
-
-**Prevention:**
-1. **Git root detection in GSD:**
-   ```bash
-   # Find .planning by walking up to git root
-   find_planning_dir() {
-     local current="$PWD"
-     while [ "$current" != "/" ]; do
-       if [ -f "$current/.planning/PROJECT.md" ]; then
-         echo "$current/.planning"
-         return 0
-       fi
-       if [ -d "$current/.git" ]; then
-         # At git root, check here
-         if [ -f "$current/.planning/PROJECT.md" ]; then
-           echo "$current/.planning"
-           return 0
-         fi
-         # Not found
-         return 1
-       fi
-       current="$(dirname "$current")"
-     done
-     return 1
-   }
-   ```
-
-2. **Environment variable fallback:**
-   ```bash
-   PLANNING_DIR="${GSD_PLANNING_DIR:-$(find_planning_dir)}"
-   ```
-
-3. **Validate during install:**
-   ```bash
-   # In init-gsd.sh
-   echo "Testing .planning discovery from subdirectory..."
-   cd /workspace/gitprojects/adventure-alerts 2>/dev/null || true
-   if ! gsd --check-config; then
-     echo "⚠️  Warning: GSD may not work from subdirectories"
-   fi
-   ```
-
-**Detection:**
-- Test: `cd /workspace/gitprojects/adventure-alerts && gsd --version`
-- Expected: Finds config
-- Actual (broken): "Config not found"
-
-**Phase mapping:** Phase 2 (Path Resolution) - fix GSD discovery before redistributing `.planning/` content.
-
----
-
-### Pitfall 4: Non-Idempotent Install Scripts Creating Duplicate Entries
-
-**What goes wrong:** `init-gsd.sh` and `mcp-setup` run on every container start (`postStartCommand`). Scripts that append to files or re-install on every run create duplicate configurations.
-
-**Why it happens:**
-- `postStartCommand` runs every time VS Code reconnects to container
-- Scripts don't check if work already done
-- Appending to shell configs (`.bashrc`) without duplicate detection
-
-**Consequences:**
-- Shell startup slows down (repeated alias definitions)
-- Config files grow unbounded
-- npm global installs re-run unnecessarily
-- Race conditions if multiple VS Code windows connect simultaneously
-
-**Prevention:**
-1. **Idempotency guards:**
-   ```bash
-   # Check before action
-   if grep -q "alias claudey=" ~/.bashrc; then
-     echo "Aliases already configured"
-   else
-     echo "alias claudey='...'" >> ~/.bashrc
-   fi
-   ```
-
-2. **State markers:**
-   ```bash
-   STATE_FILE="/home/node/.local/state/gsd-initialized"
-   if [ -f "$STATE_FILE" ]; then
-     echo "GSD already initialized (marker: $STATE_FILE)"
-     exit 0
-   fi
-   # ... do initialization ...
-   mkdir -p "$(dirname "$STATE_FILE")"
-   touch "$STATE_FILE"
-   ```
-
-3. **Separate postCreate vs postStart:**
-   ```json
-   // Run once on container create
-   "postCreateCommand": "setup-container.sh",
-   // Run on every start (lightweight checks only)
-   "postStartCommand": "init-firewall.sh && check-services.sh"
-   ```
-
-**Detection:**
-- Count alias definitions: `grep -c "alias claudey" ~/.bashrc` (should be 1)
-- Check npm list: `npm list -g --depth=0 | grep -c get-shit-done-cc` (should be 1)
-- Monitor script execution time: If `init-gsd.sh` takes >5s on restart, likely re-running work
-
-**Phase mapping:** Phase 1 (Config Migration) - make all install scripts idempotent before adding config generation logic.
-
----
-
-### Pitfall 5: Commit Ordering Breaks Buildability
-
-**What goes wrong:** Refactoring commits delete old structure before new structure is wired, breaking `devcontainer.json` references and making intermediate commits unbuildable.
-
-**Why it happens:**
-- "Delete-then-add" approach breaks containers between commits
-- Path references in multiple files (Dockerfile, devcontainer.json, shell scripts) update asynchronously
-- Git bisect becomes unusable
-- CI/CD fails on intermediate commits
-
-**Consequences:**
-- Can't roll back to specific commit safely
-- Can't bisect bugs introduced during refactor
-- Team members pulling mid-refactor get broken containers
-- Lost trust in commit history
-
-**Prevention:**
-1. **Add-Wire-Delete ordering:**
-   ```
-   Commit 1: Add new structure (infra/, new env vars)
-   Commit 2: Update references to use env vars
-   Commit 3: Test both old and new paths work
-   Commit 4: Remove old structure (claudehome/)
-   ```
-
-2. **Dual-path support during transition:**
-   ```bash
-   # Support both locations during migration
-   if [ -d "/workspace/infra/langfuse" ]; then
-     LANGFUSE_DIR="/workspace/infra/langfuse"
-   elif [ -d "/workspace/claudehome/langfuse-local" ]; then
-     LANGFUSE_DIR="/workspace/claudehome/langfuse-local"
-     echo "⚠️  Using deprecated path. Update to /workspace/infra/langfuse"
-   else
-     echo "❌ Langfuse not found"
-     exit 1
-   fi
-   ```
-
-3. **Buildability smoke test:**
-   ```bash
-   # Before each commit
-   git add . && git commit -m "..."
-   docker build -f .devcontainer/Dockerfile .
-   # If build fails, fix before pushing
-   ```
-
-**Detection:**
-- Warning sign: Dockerfile references path that doesn't exist in same commit
-- Warning sign: Script errors on container rebuild after checkout
-- Test: `git log --oneline | while read commit; do git checkout $commit && rebuild && test || echo "BROKEN: $commit"; done`
-
-**Phase mapping:** Phase 0 (Preparation) - establish commit ordering strategy before starting structural changes.
-
----
-
-## Moderate Pitfalls
-
-These cause confusion, debugging time, or minor breakage but don't require full rewrites.
-
-### Pitfall 6: WSL2 Path Translation Issues in Bind Mounts
-
-**What goes wrong:** Devcontainer.json uses `${localEnv:USERPROFILE}/.claude` which translates to Windows path (`C:\Users\sam\...`) but Docker on WSL2 expects `/mnt/c/Users/sam/...` or WSL2 native paths.
-
-**Why it happens:**
-- Docker Desktop on Windows runs Docker daemon in WSL2
-- Environment variables from Windows shell get passed through
-- Path translation is implicit and version-dependent
-
-**Consequences:**
-- Bind mount silently creates empty directory instead of mounting host directory
-- Config appears to work but doesn't persist across Docker restarts
-- Different behavior on Docker Desktop versions
-
-**Prevention:**
-- Use WSL2-native paths: `source=/home/user/.claude` (assumes WSL2 file location)
-- OR verify path translation: Add init script that checks bind mount actually contains expected files
-- Document expected host setup: "Claude Code config must be in WSL2 filesystem at /home/$USER/.claude"
-
-**Detection:**
-- Check mount: `mount | grep .claude` should show source path
-- Test persistence: Create file in container `.claude/`, restart Docker Desktop, check if file persists
-
-**Phase mapping:** Phase 1 (Config Migration) - validate path translation when switching from bind mount to volume.
-
----
-
-### Pitfall 7: Secrets in Environment Variables Visible in Process Listings
-
-**What goes wrong:** `devcontainer.json` `containerEnv` sets `LANGFUSE_SECRET_KEY` directly, making it visible in `ps aux` output and container inspect.
-
-**Why it happens:**
-- Convenience over security
-- Environment variables seem "safe" because they're not in git
-- Don't realize container metadata is accessible to all processes
-
-**Consequences:**
-- Secrets visible to any process in container
-- Logged in container metadata
-- Exposed in Docker inspect output
-- Harder to rotate secrets (requires rebuild)
-
-**Prevention:**
-1. **Use secrets files instead:**
-   ```json
-   // devcontainer.json - NO secrets
-   "containerEnv": {
-     "LANGFUSE_SECRETS_FILE": "/home/node/.claude/secrets.json"
-   }
-   ```
-
-2. **Load secrets at runtime:**
-   ```bash
-   # In application startup
-   if [ -f "$LANGFUSE_SECRETS_FILE" ]; then
-     export LANGFUSE_SECRET_KEY=$(jq -r '.langfuse.secretKey' "$LANGFUSE_SECRETS_FILE")
-   fi
-   ```
-
-3. **Validate secrets not in env:**
-   ```bash
-   # Safety check
-   if env | grep -i "secret\|password\|key" | grep -v "_FILE="; then
-     echo "⚠️  Secrets detected in environment variables"
-   fi
-   ```
-
-**Detection:**
-- Check: `docker inspect <container> | grep -i secret`
-- Check: `env | grep -i secret` inside container
-
-**Phase mapping:** Phase 1 (Config Migration) - move secrets from containerEnv to secrets.json.
-
----
-
-### Pitfall 8: Generated Config Files Committed to Git
-
-**What goes wrong:** `.mcp.json` is generated by `mcp-setup` on container start but accidentally gets committed, causing merge conflicts and stale config.
-
-**Why it happens:**
-- File appears in workspace root
-- Looks like a config file that should be versioned
-- Not in `.gitignore` initially (added later)
-
-**Consequences:**
-- Merge conflicts when multiple developers have different gateway URLs
-- Stale config overrides generated config
-- Git status always dirty
-
-**Prevention:**
-1. **Defensive .gitignore pattern:**
-   ```gitignore
-   # Generated configs (MUST be regenerated per-environment)
-   .mcp.json
-   **/*.generated.json
-   ```
-
-2. **Template approach:**
-   ```
-   Commit:  .mcp.json.template
-   Generate: .mcp.json (gitignored)
-   Script:   mcp-setup generates from template
-   ```
-
-3. **Validate in CI:**
-   ```bash
-   # Pre-commit hook
-   if git diff --cached --name-only | grep -q ".mcp.json"; then
-     echo "❌ .mcp.json should not be committed (generated file)"
-     exit 1
-   fi
-   ```
-
-**Detection:**
-- Check: `git status` should never show `.mcp.json` as modified
-- Check: `.gitignore` contains pattern for generated files
-
-**Phase mapping:** Phase 0 (Preparation) - audit all generated files, ensure .gitignore complete.
-
----
-
-## Minor Pitfalls
-
-These cause small annoyances or cosmetic issues.
-
-### Pitfall 9: Shell Aliases Not Available in Non-Interactive Shells
-
-**What goes wrong:** Aliases like `claudey` work in interactive terminal but fail in scripts or `postStartCommand`.
-
-**Why it happens:**
-- `.bashrc` and `.zshrc` only sourced for interactive shells
-- Aliases are shell-specific, not inherited by child processes
-- Scripts often run in `/bin/sh` not `/bin/bash`
-
-**Consequences:**
-- Can't use `claudey` in automation
-- Documentation says "run claudey" but scripts must use full command
-- Inconsistent UX between manual and automated workflows
-
-**Prevention:**
-1. **Functions instead of aliases:**
-   ```bash
-   # Functions work in scripts
-   claudey() {
-     cd "${CLAUDE_WORKSPACE:-/workspace}" && claude --dangerously-skip-permissions "$@"
-   }
-   export -f claudey  # Make available to subshells
-   ```
-
-2. **PATH-based commands:**
-   ```bash
-   # Create /usr/local/bin/claudey
-   #!/bin/bash
-   cd "${CLAUDE_WORKSPACE:-/workspace}" && claude --dangerously-skip-permissions "$@"
-   ```
-
-3. **Document shell requirements:**
-   ```
-   # Aliases only work in interactive bash/zsh
-   # For scripts, use: cd /workspace && claude
-   ```
-
-**Detection:**
-- Test: `bash -c "claudey --version"` (non-interactive shell)
-- Expected: Works
-- Actual (broken): Command not found
-
-**Phase mapping:** Phase 0 (Preparation) - convert critical aliases to functions or PATH commands.
-
----
-
-### Pitfall 10: Firewall Script Runs Before Docker Socket Permissions Fixed
-
-**What goes wrong:** `postStartCommand` runs `init-firewall.sh` before `setup-container.sh` has run `chmod 666 /var/run/docker.sock`, causing permission errors.
-
-**Why it happens:**
-- `postCreateCommand` runs once (setup-container.sh)
-- `postStartCommand` runs every start (init-firewall.sh first)
-- Race condition on first container start
-
-**Consequences:**
-- Firewall setup fails on initial container create
-- Error message confusing ("Permission denied" on docker.sock)
-- Requires manual restart to fix
-
-**Prevention:**
-1. **Correct command ordering:**
-   ```json
-   "postCreateCommand": "bash .devcontainer/setup-container.sh",
-   "postStartCommand": "bash .devcontainer/init-firewall.sh && ..."
-   ```
-
-2. **Defensive permission check:**
-   ```bash
-   # In init-firewall.sh
-   if [ ! -w /var/run/docker.sock ]; then
-     echo "⚠️  Waiting for docker.sock permissions..."
-     for i in {1..10}; do
-       sleep 1
-       if [ -w /var/run/docker.sock ]; then
-         break
-       fi
-     done
-   fi
-   ```
-
-3. **Inline permission fix:**
-   ```json
-   "postStartCommand": "sudo chmod 666 /var/run/docker.sock && sudo /usr/local/bin/init-firewall.sh && ..."
-   ```
-
-**Detection:**
-- Check container logs: Look for permission errors in postStartCommand
-- Test: Fresh container create (delete container, rebuild)
-
-**Phase mapping:** Phase 0 (Preparation) - verify command execution order is correct.
-
----
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Directory dissolution (claudehome/) | Path references in 10+ files break simultaneously | Create reference inventory first: `grep -r "claudehome" .devcontainer/ claudehome/` |
-| Bind mount removal (~/.claude) | Auth tokens lost on rebuild | Implement secrets.json + volume strategy before removing mount |
-| Config generation (mcp-setup, init-gsd) | Non-idempotent scripts run on every start | Add state markers and duplicate detection |
-| Skills redistribution | Import paths in agent configs break | Update skills before moving files, test with grep |
-| Langfuse path change | Scripts hard-coded to claudehome/langfuse-local/ | Add LANGFUSE_STACK_DIR env var first |
-| .planning/ discovery | GSD can't find config from gitprojects/ subdirs | Fix GSD upward traversal before testing from subdirs |
-
----
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: "Works on My Machine" Testing
-
-**What it looks like:**
-- Test refactor only from cached container layers
-- Don't test fresh container create from scratch
-- Don't test from different working directories
-
-**Why it's bad:**
-- Cached layers hide missing dependencies
-- Fresh create reveals ordering bugs
-- Different working dirs reveal hard-coded paths
-
-**Do instead:**
 ```bash
-# Force fresh build
-docker compose down -v
-docker system prune -f
-# Rebuild from scratch
-# Test from multiple starting directories
+# WRONG: This overwrites arrays
+jq --argjson plugin_hooks "$PLUGIN_HOOKS" '.hooks * $plugin_hooks' settings.local.json
+
+# CORRECT: Custom recursive merge that concatenates arrays
+jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
+  def recursive_merge:
+    . as $left | $plugin_hooks as $right |
+    if ($left | type) == "object" and ($right | type) == "object" then
+      reduce ([$left, $right] | add | keys_unsorted[]) as $key ({};
+        .[$key] = (
+          if ($left[$key] | type) == "array" and ($right[$key] | type) == "array" then
+            ($left[$key] + $right[$key])
+          elif ($left[$key] | type) == "object" and ($right[$key] | type) == "object" then
+            ($left[$key] | recursive_merge)
+          else
+            $right[$key]
+          end
+        )
+      )
+    else
+      $right
+    end;
+  .hooks = (.hooks | recursive_merge)
+' settings.local.json
 ```
 
+**Warning signs:**
+- After install, `cat ~/.claude/settings.local.json | jq .hooks.Stop` shows only one hook when you expected multiple
+- Langfuse tracing stops working after adding a plugin with a `Stop` hook
+- Test by checking hook array lengths before/after merge
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — must implement correct array concatenation from the start, as fixing this later requires migrating existing plugin installations.
+
 ---
 
-### Anti-Pattern 2: Silent Fallbacks
+### Pitfall 2: .mcp.json Double-Write Race Condition
 
-**What it looks like:**
-```bash
-# BAD: Silent fallback to broken state
-CONFIG_FILE="${CUSTOM_CONFIG:-/dev/null}"
-cat "$CONFIG_FILE" || true  # Continues with empty config
+**What goes wrong:**
+The `postStartCommand` in devcontainer.json runs `mcp-setup` which **overwrites `~/.claude/.mcp.json`** after `install-agent-config.sh` has already written it. Any plugin MCP server registrations added during `install-agent-config.sh` are silently lost. Users report "plugin MCP server not found" but the install script showed success.
+
+**Why it happens:**
+Sequential command execution in `postStartCommand`:
+1. `install-agent-config.sh` runs (in `postCreateCommand`)
+2. Writes `.mcp.json` with plugin MCP servers merged in
+3. Later, `postStartCommand` runs `mcp-setup`
+4. `mcp-setup` regenerates `.mcp.json` from config.json templates **without plugin data**
+5. Plugin MCP servers are gone
+
+The current devcontainer.json shows:
+```json
+"postStartCommand": "... && mcp-setup",
+"postCreateCommand": "bash .devcontainer/install-agent-config.sh"
 ```
 
-**Why it's bad:**
-- Errors hidden until much later
-- User doesn't know config missing
-- Debugging becomes archaeological exercise
+**How to avoid:**
+**Option A (Recommended):** Make `mcp-setup` plugin-aware — read existing `.mcp.json`, preserve plugin entries, merge with template entries.
 
-**Do instead:**
 ```bash
-# GOOD: Fail loudly and early
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "❌ ERROR: Config not found: $CONFIG_FILE"
-  echo "Expected location: ..."
-  exit 1
+# In mcp-setup: preserve existing plugin servers
+EXISTING_MCP="{}"
+if [ -f "$CLAUDE_DIR/.mcp.json" ]; then
+    EXISTING_MCP=$(jq '.mcpServers // {}' "$CLAUDE_DIR/.mcp.json")
+fi
+
+# Generate new MCP config from templates
+# ... existing logic ...
+
+# Merge: template servers + existing plugin servers (plugins win on collision)
+jq --argjson existing "$EXISTING_MCP" '.mcpServers += $existing' new-mcp.json > "$CLAUDE_DIR/.mcp.json"
+```
+
+**Option B:** Move `mcp-setup` to run **before** plugin installation in `install-agent-config.sh`, so plugins always run last.
+
+**Warning signs:**
+- Plugin's `mcp_servers` declared in `plugin.json` but `npx @anthropic/code mcp list` doesn't show them
+- Plugin MCP server works after `install-agent-config.sh` runs standalone, but not after full container rebuild
+- `.mcp.json` timestamp is newer than install script completion
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — critical blocker, must fix before plugin MCP server feature works at all.
+
+---
+
+### Pitfall 3: GSD File Clobbering During Plugin Installation
+
+**What goes wrong:**
+A plugin provides `commands/*.md` or `agents/*.md` files that **overwrite GSD framework files** because plugin file copying happens before GSD installation, or a plugin maliciously/accidentally includes files named `gsd-*.md`. Result: GSD commands break or disappear.
+
+**Why it happens:**
+The spec shows this copy logic for plugins:
+```bash
+[ -d "$plugin_dir/commands" ] && {
+    for cmd_file in "$plugin_dir/commands/"*.md; do
+        [ -f "$cmd_file" ] || continue
+        cp "$cmd_file" "$CLAUDE_DIR/commands/"
+    done
+}
+```
+
+This **unconditionally copies** plugin command files. If a plugin has `commands/gsd-new-project.md`, it will overwrite the actual GSD file when GSD installs later.
+
+Current install order (from spec):
+1. Copy standalone commands
+2. Install plugins (copies commands from all plugins)
+3. Install GSD (npx — writes to `commands/gsd/` and `agents/gsd-*.md`)
+
+**How to avoid:**
+**For commands:** Check if destination is inside `gsd/` subdirectory before copying:
+
+```bash
+[ -d "$plugin_dir/commands" ] && {
+    for cmd_file in "$plugin_dir/commands/"*.md; do
+        [ -f "$cmd_file" ] || continue
+        cmd_name=$(basename "$cmd_file")
+        # Skip if trying to overwrite GSD directory
+        if [ "$cmd_name" = "gsd" ]; then
+            echo "[install] WARNING: Plugin '$plugin_name' tried to provide 'gsd' directory — skipping"
+            continue
+        fi
+        cp "$cmd_file" "$CLAUDE_DIR/commands/"
+    done
+}
+```
+
+**For agents:** Skip files matching `gsd-*.md` pattern:
+
+```bash
+[ -d "$plugin_dir/agents" ] && {
+    for agent_file in "$plugin_dir/agents/"*.md; do
+        [ -f "$agent_file" ] || continue
+        agent_name=$(basename "$agent_file")
+        # Don't overwrite GSD agents (gsd-*.md pattern)
+        if [[ "$agent_name" =~ ^gsd- ]]; then
+            echo "[install] WARNING: Plugin '$plugin_name' tried to provide GSD agent '$agent_name' — skipping"
+            continue
+        fi
+        cp "$agent_file" "$CLAUDE_DIR/agents/"
+    done
+}
+```
+
+**Warning signs:**
+- `/gsd:new-project` command not found after installing a plugin
+- `ls ~/.claude/commands/gsd/` shows unexpected files or missing expected files
+- `ls ~/.claude/agents/` shows duplicate `gsd-*.md` files with wrong content
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — add GSD protection during initial plugin file copy implementation.
+
+---
+
+### Pitfall 4: Empty Object/Null Value Merge Corruption
+
+**What goes wrong:**
+When a plugin's `plugin.json` has `"env": {}` (empty object) or `"hooks": null`, jq merge operations produce unexpected results. The install script accumulates plugin data like this:
+
+```bash
+PLUGIN_ENV=$(echo "$PLUGIN_ENV" "$PLUGIN_ENV_FROM_MANIFEST" | jq -s '.[0] * .[1]')
+```
+
+If `PLUGIN_ENV_FROM_MANIFEST` is `null` (because `jq -r '.env // {}' "$MANIFEST"` failed), the merge corrupts `PLUGIN_ENV` or produces invalid JSON.
+
+**Why it happens:**
+- `jq -r` (raw output) on a null field returns the string `"null"`, not JSON null
+- Merging JSON string `"null"` with an object fails
+- `jq -s '.[0] * .[1]'` with `null` as one operand has different behavior than with `{}` ([JQ - Handling null values and default values](https://www.devtoolsdaily.com/blog/jq-null-values-and-default/))
+
+**How to avoid:**
+Always use `jq` without `-r` for JSON extraction, and ensure null coalescing to empty object:
+
+```bash
+# WRONG: -r flag produces string "null" instead of JSON null
+PLUGIN_ENV_FROM_MANIFEST=$(jq -r '.env // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+
+# CORRECT: No -r flag, produces JSON; coalesce null to {}
+PLUGIN_ENV_FROM_MANIFEST=$(jq '.env // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+
+# CORRECT: Defensive merge that handles null/empty gracefully
+if [ "$PLUGIN_ENV_FROM_MANIFEST" != "{}" ] && [ "$PLUGIN_ENV_FROM_MANIFEST" != "null" ]; then
+    PLUGIN_ENV=$(echo "$PLUGIN_ENV" "$PLUGIN_ENV_FROM_MANIFEST" | jq -s '.[0] * .[1]')
 fi
 ```
 
----
+**Warning signs:**
+- `jq` errors during plugin installation: "parse error: Invalid numeric literal"
+- `settings.local.json` has malformed `env` section after plugin install
+- Plugin env vars are missing or set to literal string "null"
 
-### Anti-Pattern 3: Mega-Commit Refactors
-
-**What it looks like:**
-- Single commit: "Refactor devcontainer structure"
-- 50+ files changed
-- Multiple concerns mixed (path changes + secret handling + feature adds)
-
-**Why it's bad:**
-- Can't bisect bugs
-- Can't review atomically
-- Can't roll back partially
-
-**Do instead:**
-- Commit per logical change
-- Each commit builds and runs
-- Group related changes: "Add env vars" → "Update scripts to use env vars" → "Remove old paths"
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — add defensive null handling in initial plugin accumulation logic.
 
 ---
+
+### Pitfall 5: Glob Pattern No-Match Literal Iteration
+
+**What goes wrong:**
+During plugin file discovery, if a plugin has no `commands/*.md` files, the glob `"$plugin_dir/commands/"*.md` doesn't match anything. Without proper checks, bash iterates once with the **literal glob string** as the filename:
+
+```bash
+for cmd_file in "$plugin_dir/commands/"*.md; do
+    cp "$cmd_file" "$CLAUDE_DIR/commands/"  # Copies literal "*.md" filename
+done
+```
+
+This creates a file named `*.md` in the commands directory, breaking command discovery.
+
+**Why it happens:**
+By default, when a glob pattern doesn't match any files, bash leaves it as a literal string. The loop runs once with the variable set to the unexpanded pattern ([BashPitfalls - Greg's Wiki](https://mywiki.wooledge.org/BashPitfalls)).
+
+**How to avoid:**
+Always guard glob-based loops with `[ -f "$var" ] || continue`:
+
+```bash
+for cmd_file in "$plugin_dir/commands/"*.md; do
+    [ -f "$cmd_file" ] || continue  # Skip if glob didn't match
+    cmd_name=$(basename "$cmd_file")
+    cp "$cmd_file" "$CLAUDE_DIR/commands/"
+done
+```
+
+The spec already includes this pattern in some places but not consistently. Verify all plugin file iteration loops have this guard.
+
+**Warning signs:**
+- File named `*.md` appears in `~/.claude/commands/` or `~/.claude/agents/`
+- Command palette shows an entry for `*` as a command
+- `ls -la ~/.claude/commands/` shows files with glob characters in the name
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — audit all glob-based loops during initial implementation; add guards where missing.
+
+---
+
+### Pitfall 6: Hook Execution Order Non-Determinism
+
+**What goes wrong:**
+Multiple plugins register hooks for the same event (`Stop`, `SessionStart`, etc.). Users expect plugins to execute in a specific order (e.g., "logging plugin must run before analytics plugin"), but the actual execution order is **filesystem-dependent** and unpredictable across systems.
+
+The spec states: "Order is determined by filesystem sort order of plugin directory names (alphabetical)." This works on Linux with standard filesystems but can break on case-insensitive filesystems (macOS HFS+/APFS), network mounts, or when users rename plugin directories.
+
+**Why it happens:**
+Bash glob expansion order depends on filesystem directory entry order, which is implementation-defined. Most modern filesystems return entries in inode order or hash order, not alphabetical order. The `for plugin_dir in "$AGENT_CONFIG_DIR/plugins"/*/` loop order is not guaranteed ([glob - Greg's Wiki](https://mywiki.wooledge.org/glob)).
+
+**How to avoid:**
+Explicitly sort plugin directories before iteration:
+
+```bash
+# WRONG: Filesystem-dependent order
+for plugin_dir in "$AGENT_CONFIG_DIR/plugins"/*/; do
+
+# CORRECT: Guaranteed alphabetical order
+while IFS= read -r -d '' plugin_dir; do
+    # ... process plugin ...
+done < <(find "$AGENT_CONFIG_DIR/plugins" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+```
+
+Or simpler, using sorted array:
+
+```bash
+mapfile -t PLUGIN_DIRS < <(find "$AGENT_CONFIG_DIR/plugins" -mindepth 1 -maxdepth 1 -type d | sort)
+for plugin_dir in "${PLUGIN_DIRS[@]}"; do
+    # ... process plugin ...
+done
+```
+
+**Warning signs:**
+- Hooks execute in different order after container rebuild on different machine
+- User reports "it works on my Mac but not in production"
+- Hook execution order changes after renaming a plugin directory
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — use sorted iteration from the start; document the alphabetical ordering contract.
+
+---
+
+### Pitfall 7: sed Token Replacement with Unescaped Special Characters
+
+**What goes wrong:**
+When hydrating plugin MCP server configs with secrets containing special characters (e.g., API keys with `/`, `&`, `$`), the current sed-based token replacement breaks:
+
+```bash
+# From spec (vulnerable):
+HYDRATED_MCP=$(echo "$PLUGIN_MCP" | sed "s|{{MCP_GATEWAY_URL}}|$MCP_GATEWAY_URL|g")
+```
+
+If `MCP_GATEWAY_URL` contains `&`, sed interprets it as "insert entire match" and corrupts the output. If it contains `/`, the `|` delimiter doesn't help because `$` triggers variable expansion in double quotes.
+
+**Why it happens:**
+sed replacement strings treat `&`, `\`, and delimiter characters as special. Shell variable expansion in double quotes interprets `$`, `` ` ``, `!`, `\` before sed sees them ([Quotes and escaping - The Bash Hackers Wiki](https://flokoe.github.io/bash-hackers-wiki/syntax/quoting/)).
+
+**How to avoid:**
+Use jq for token replacement instead of sed when working with JSON:
+
+```bash
+# CORRECT: jq handles escaping automatically
+HYDRATED_MCP=$(echo "$PLUGIN_MCP" | jq \
+    --arg gateway_url "$MCP_GATEWAY_URL" \
+    'walk(if type == "string" then gsub("{{MCP_GATEWAY_URL}}"; $gateway_url) else . end)')
+```
+
+For multiple token replacements:
+
+```bash
+HYDRATED_MCP=$(echo "$PLUGIN_MCP" | jq \
+    --arg gateway "$MCP_GATEWAY_URL" \
+    --arg api_key "$SOME_API_KEY" \
+    'walk(if type == "string" then
+        gsub("{{MCP_GATEWAY_URL}}"; $gateway) |
+        gsub("{{SOME_API_KEY}}"; $api_key)
+     else . end)')
+```
+
+**Warning signs:**
+- `.mcp.json` contains corrupted URLs with duplicated parts
+- MCP server fails to connect with "invalid URL" error
+- Secrets containing `$`, `&`, or `/` cause install script errors
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — replace sed token hydration with jq before plugin MCP server feature ships.
+
+---
+
+### Pitfall 8: Atomic Write Failure During Settings Merge
+
+**What goes wrong:**
+The spec shows this pattern for merging plugin data into settings:
+
+```bash
+jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' \
+    "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
+    && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+```
+
+If jq fails (malformed JSON, out of disk space, jq version incompatibility), the redirect `> "$SETTINGS_FILE.tmp"` still succeeds, creating an empty or partial file. The `&&` prevents the `mv`, but `settings.local.json` is left in an inconsistent state for the next operation that reads it.
+
+**Why it happens:**
+Shell redirection (`>`) happens before the command runs. If jq fails, bash creates the output file first, then runs jq, which writes nothing or partial output ([How to Atomic Create a File If Not Exists in Bash Script](https://linuxvox.com/blog/atomic-create-file-if-not-exists-from-bash-script/)).
+
+**How to avoid:**
+Validate jq success before moving temp file, and use temp file in same directory (atomic rename guarantee):
+
+```bash
+TEMP_FILE=$(mktemp "$SETTINGS_FILE.XXXXXX")  # Same directory as target
+if jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' "$SETTINGS_FILE" > "$TEMP_FILE"; then
+    mv "$TEMP_FILE" "$SETTINGS_FILE"
+else
+    echo "[install] ERROR: Failed to merge plugin env vars"
+    rm -f "$TEMP_FILE"
+    return 1
+fi
+```
+
+Even better, validate the output is valid JSON before moving:
+
+```bash
+TEMP_FILE=$(mktemp "$SETTINGS_FILE.XXXXXX")
+jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' "$SETTINGS_FILE" > "$TEMP_FILE"
+if jq empty < "$TEMP_FILE" 2>/dev/null; then
+    mv "$TEMP_FILE" "$SETTINGS_FILE"
+else
+    echo "[install] ERROR: Plugin env merge produced invalid JSON"
+    rm -f "$TEMP_FILE"
+    return 1
+fi
+```
+
+**Warning signs:**
+- Corrupted `settings.local.json` after plugin installation
+- Claude Code fails to start with "invalid settings file" error
+- Empty or partial `settings.local.json` after script interruption (Ctrl+C, container stop)
+
+**Phase to address:**
+**Phase 1 (Core Plugin System)** — implement atomic write pattern for all JSON file modifications.
+
+---
+
+### Pitfall 9: Plugin Hook Script Execution Failure Silent Swallowing
+
+**What goes wrong:**
+A plugin registers a hook in `plugin.json`:
+
+```json
+"hooks": {
+  "Stop": [{"type": "command", "command": "python3 ~/.claude/hooks/broken_hook.py"}]
+}
+```
+
+The hook script has a bug (missing dependency, syntax error, wrong shebang). During installation, the hook registration is successfully merged into `settings.local.json`, but when Claude Code fires the `Stop` event, the hook fails silently. The user never knows the plugin's hook didn't work.
+
+**Why it happens:**
+The install script doesn't validate that hook command paths exist or are executable. Claude Code may log hook failures to a file the user never checks. The spec says: "The install script could validate this and warn, but shouldn't block."
+
+**How to avoid:**
+**During installation:** Validate hook commands reference files that exist and are executable:
+
+```bash
+# After accumulating hooks from plugin.json
+# Validate each hook command before merging
+for event in $(echo "$PLUGIN_HOOKS" | jq -r 'keys[]'); do
+    hooks=$(echo "$PLUGIN_HOOKS" | jq -c ".[$event][]")
+    while IFS= read -r hook; do
+        cmd=$(echo "$hook" | jq -r '.command')
+        # Extract script path (first argument before flags/params)
+        script_path=$(echo "$cmd" | awk '{print $2}')  # e.g., "~/.claude/hooks/script.py"
+        script_path_expanded="${script_path/#\~/$HOME}"
+
+        if [ ! -f "$script_path_expanded" ]; then
+            echo "[install] WARNING: Plugin '$plugin_name' hook for '$event' references missing file: $script_path"
+        elif [ ! -x "$script_path_expanded" ]; then
+            echo "[install] WARNING: Plugin '$plugin_name' hook for '$event' references non-executable file: $script_path"
+        fi
+    done <<< "$hooks"
+done
+```
+
+**Runtime:** Ensure hook scripts exit 0 on success and log failures:
+
+```python
+# In plugin hook scripts
+import sys
+try:
+    # ... hook logic ...
+    sys.exit(0)
+except Exception as e:
+    with open(os.path.expanduser("~/.claude/hooks/hook-errors.log"), "a") as f:
+        f.write(f"{datetime.now()} ERROR in hook: {e}\n")
+    sys.exit(0)  # Don't block Claude Code from continuing
+```
+
+**Warning signs:**
+- Plugin declares a hook but the expected side effect never happens (file not created, API not called)
+- `~/.claude/hooks/` contains script with wrong permissions or missing shebang
+- Hook worked when manually run but not when triggered by Claude Code event
+
+**Phase to address:**
+**Phase 2 (Hook Validation)** — add hook validation as a separate validation pass after core plugin installation works.
+
+---
+
+### Pitfall 10: Langfuse Migration Breaking Existing Behavior
+
+**What goes wrong:**
+When migrating the existing hardcoded Langfuse hook from `settings.json.template` to a plugin:
+
+1. Remove hook registration from `settings.json.template`
+2. Create `plugins/langfuse-tracing/plugin.json` with hook registration
+3. After rebuild, Langfuse tracing **stops working** even though plugin shows as installed
+
+**Why it happens:**
+The template's hook structure doesn't match the plugin's hook structure. Current template shows:
+
+```json
+"hooks": {
+  "Stop": [
+    {
+      "hooks": [
+        {"type": "command", "command": "python3 /home/node/.claude/hooks/langfuse_hook.py"}
+      ]
+    }
+  ]
+}
+```
+
+This is **nested arrays** (array of objects containing arrays of hooks). The plugin spec shows:
+
+```json
+"hooks": {
+  "Stop": [
+    {"type": "command", "command": "python3 ~/.claude/hooks/langfuse_hook.py"}
+  ]
+}
+```
+
+This is **flat arrays** (array of hook objects). When merging, these structures conflict, causing Claude Code to parse hooks incorrectly.
+
+**How to avoid:**
+**Before migration:**
+1. Verify the exact hook structure Claude Code expects by checking official docs
+2. Test plugin hook registration with a minimal test plugin before migrating Langfuse
+3. Keep both template hook AND plugin hook during transition period, verify both work
+
+**During migration:**
+1. Update `settings.json.template` to use the same structure as plugin hooks
+2. Remove template hook registration ONLY AFTER plugin hook is confirmed working
+3. Add migration validation: script checks if Langfuse hook exists in settings after plugin install
+
+```bash
+# Validation after plugin installation
+if [ "$PLUGIN_NAME" = "langfuse-tracing" ]; then
+    LANGFUSE_HOOK_COUNT=$(jq '[.hooks.Stop[]? | select(.type == "command" and (.command | contains("langfuse_hook.py")))] | length' "$CLAUDE_DIR/settings.local.json")
+    if [ "$LANGFUSE_HOOK_COUNT" -eq 0 ]; then
+        echo "[install] ERROR: Langfuse plugin installed but hook not found in settings"
+        return 1
+    fi
+fi
+```
+
+**Warning signs:**
+- Langfuse UI shows no new traces after container rebuild
+- `cat ~/.claude/settings.local.json | jq .hooks.Stop` shows unexpected structure
+- Hook registration exists but with wrong nesting level
+
+**Phase to address:**
+**Phase 3 (Langfuse Migration)** — dedicated phase for migrating existing hook to plugin system, with before/after testing.
+
+---
+
+## Technical Debt Patterns
+
+Shortcuts that seem reasonable but create long-term problems.
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Use `*` operator for all jq merges | Simple one-liner, works for objects | Arrays get overwritten; plugin hooks disappear | **Never** — arrays are common in settings |
+| Skip hook command validation during install | Faster install, less code | Silent failures at runtime; users don't know hooks are broken | **Never** — warnings cost nothing |
+| Use sed for JSON token replacement | Familiar tool, fewer dependencies | Breaks with special characters; produces corrupt JSON | **Never** — jq is already required |
+| Single temp file name for atomic writes | Simple pattern | Race condition if parallel installs | Only if guaranteed single install process |
+| Alphabetical plugin ordering by directory listing | No extra code needed | Non-deterministic across filesystems | **Never** — explicit sort is one line |
+| Disable plugin by deleting directory | Intuitive for users | Breaks on next git pull; lost local plugins | Only for quick debugging, not production |
+| Use `-r` flag with jq for all extractions | Raw strings easier to work with in bash | Null becomes string "null", breaks JSON merges | Only for final output (echo to user), not intermediate JSON |
+
+## Integration Gotchas
+
+Common mistakes when connecting plugin system to existing components.
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| mcp-setup script | Running after plugin install, overwriting `.mcp.json` | Make mcp-setup plugin-aware; merge plugin entries with template entries |
+| GSD installation | Installing GSD before plugins, allowing plugins to overwrite GSD files | Install GSD last; add explicit guards to prevent plugin files from clobbering GSD namespace |
+| settings.local.json generation | Merge plugins directly into template-hydrated settings | Hydrate template first, then merge plugin data in separate step with array concatenation |
+| postStartCommand timing | Assuming postStartCommand runs after postCreateCommand completes | Explicitly order operations: template hydration → plugin install → mcp-setup (plugin-aware) |
+| config.json plugin disabling | Deleting disabled plugin's files during install | Leave files in place; skip registration only; allows re-enabling without re-copy |
+
+## Performance Traps
+
+Patterns that work at small scale but fail as usage grows.
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Re-reading settings.json for each plugin | Install gets slower with more plugins | Accumulate all plugin data, do single merge at end | 10+ plugins (noticeable lag) |
+| No incremental plugin updates | Every install copies all plugin files even if unchanged | Check file timestamps or hashes before copying | 20+ plugins with large skill reference docs |
+| Multiple jq invocations in loops | High CPU usage during install | Accumulate JSON in bash variables, single jq merge | 15+ plugins with complex manifests |
+| Unbounded hook array concatenation | settings.json grows indefinitely if plugins re-register hooks | Deduplicate hooks by command string before merge | After 5+ container rebuilds with same plugins |
+| No validation short-circuit | Install validates all 50 plugins even if first one fails | Stop on first critical validation failure (missing plugin.json) | 30+ plugins in development |
+
+## Security Mistakes
+
+Domain-specific security issues beyond general web security.
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Executing plugin hook scripts during install | Malicious plugin runs arbitrary code during install | Never execute hooks at install time; only copy and register them |
+| Exposing secrets in plugin.json | Plugin commits API keys to git | Use token placeholders (`{{API_KEY}}`), hydrate from secrets.json only |
+| No plugin.json schema validation | Malicious JSON could exploit jq vulnerabilities | Validate plugin.json structure before passing to jq |
+| Plugin hooks run as same user as Claude Code | Compromised hook has full filesystem access | Not preventable in current architecture; document in plugin security guide |
+| Copying plugin files without sanitizing paths | Path traversal: `../../.ssh/authorized_keys` | Validate plugin files don't escape plugin directory before copying |
+
+## UX Pitfalls
+
+Common user experience mistakes in this domain.
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| No feedback when plugin disabled via config.json | User edits `plugin.json`, rebuilds, wonders why changes didn't apply | Log: "Plugin 'foo': disabled in config.json, skipping" |
+| Silent hook registration failures | Plugin appears installed but doesn't work | Validate hook commands exist; warn if missing (see Pitfall 9) |
+| No differentiation between plugin errors and install errors | User sees "install failed", doesn't know which plugin broke | Prefix all plugin logs with `[install] Plugin 'name':` |
+| Overwriting existing files without warning | User's custom command.md silently replaced by plugin | Check for conflicts, prompt or log warning: "Overwriting existing file" |
+| No way to verify plugin installation | User doesn't know if plugin actually loaded | Print summary: "Installed 3 plugin(s): langfuse-tracing, auto-lint, my-plugin" |
+
+## "Looks Done But Isn't" Checklist
+
+Things that appear complete but are missing critical pieces.
+
+- [ ] **Hook array merging:** Verify hooks from multiple plugins actually concatenate, not overwrite — test with 2 plugins registering same event
+- [ ] **MCP server registration:** After full container rebuild (not just install script), verify plugin MCP servers appear in `npx @anthropic/code mcp list`
+- [ ] **GSD protection:** After installing plugin with `commands/test.md` and `agents/custom.md`, verify GSD commands still work and GSD agents weren't overwritten
+- [ ] **Null value handling:** Create plugin with `"env": null` in plugin.json, verify install doesn't crash or corrupt settings.local.json
+- [ ] **Empty plugin directory:** Create plugin with only plugin.json (no skills/commands/hooks), verify install succeeds without errors
+- [ ] **Special characters in secrets:** Set `MCP_GATEWAY_URL` to `http://host:8080/path?foo=bar&baz=qux`, verify `.mcp.json` hydration is correct
+- [ ] **Glob no-match:** Create plugin with empty `commands/` directory, verify no `*.md` file appears in `~/.claude/commands/`
+- [ ] **Alphabetical plugin order:** Create plugins named `z-last`, `a-first`, `m-middle`, verify hooks execute in alphabetical order
+- [ ] **Langfuse migration:** After migrating langfuse to plugin, verify tracing still works (check Langfuse UI for new traces)
+- [ ] **Atomic write interruption:** Kill install script during jq merge (`kill -9` during plugin install), verify settings.local.json is not corrupted
+
+## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Array overwrite corrupted hooks | LOW | 1. Delete `~/.claude/settings.local.json` 2. Rebuild container 3. Install script regenerates |
+| .mcp.json overwritten by mcp-setup | LOW | 1. Re-run `install-agent-config.sh` manually 2. Plugin MCP servers re-registered |
+| GSD files clobbered by plugin | MEDIUM | 1. Delete `~/.claude/commands/gsd/` 2. Manually run `npx get-shit-done-cc --claude --global` |
+| Corrupted settings.json from null merge | LOW | 1. `rm ~/.claude/settings.local.json` 2. `bash .devcontainer/install-agent-config.sh` |
+| Invalid JSON from failed atomic write | LOW | 1. Check for `.tmp` files in `~/.claude/` 2. Restore from template: re-run install script |
+| Hook command path doesn't exist | LOW | 1. Fix plugin hook script path in plugin.json 2. Rebuild or re-run install script |
+| Plugin execution order wrong | MEDIUM | 1. Rename plugin directories to force alphabetical order (e.g., `01-logging`, `02-analytics`) |
+| sed token replacement corruption | MEDIUM | 1. Clear corrupted `.mcp.json` 2. Update install script to use jq 3. Rebuild |
+| Langfuse migration broke tracing | MEDIUM | 1. Revert settings.json.template to include hardcoded hook 2. Disable langfuse-tracing plugin 3. Debug structure mismatch |
+
+## Pitfall-to-Phase Mapping
+
+How roadmap phases should address these pitfalls.
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| jq array overwriting | Phase 1 (Core Plugin System) | Install 2 plugins with same hook event, verify both hooks in settings.local.json |
+| .mcp.json double-write | Phase 1 (Core Plugin System) | Full container rebuild, verify plugin MCP server in `mcp list` output |
+| GSD file clobbering | Phase 1 (Core Plugin System) | Install plugin with commands/agents, verify GSD commands still work |
+| Null value merge corruption | Phase 1 (Core Plugin System) | Create plugin with null/empty fields, verify install succeeds |
+| Glob pattern no-match | Phase 1 (Core Plugin System) | Create plugin with empty subdirs, verify no glob literal files |
+| Hook execution order | Phase 1 (Core Plugin System) | Name plugins `z-`, `a-`, `m-`, verify order in hook logs |
+| sed token replacement | Phase 1 (Core Plugin System) | Use secret with special chars, verify MCP config correct |
+| Atomic write failure | Phase 1 (Core Plugin System) | Kill install script mid-merge (manual test), verify JSON valid |
+| Hook script validation | Phase 2 (Hook Validation) | Install plugin with broken hook path, verify warning logged |
+| Langfuse migration | Phase 3 (Langfuse Migration) | Migrate to plugin, verify traces appear in Langfuse UI |
 
 ## Sources
 
-**Confidence Assessment:**
-- **Training Data (MEDIUM confidence):** Devcontainer patterns, Docker best practices, shell scripting pitfalls are well-established in training data (pre-2025)
-- **Codebase Analysis (HIGH confidence):** Specific pitfalls identified by reading actual `.devcontainer/`, scripts, and current structure
-- **WebSearch (UNAVAILABLE):** Could not verify 2026-specific devcontainer changes or recent VS Code updates
+### jq Merging and Edge Cases
+- [How to Recursively Merge JSON Objects and Concatenate Arrays with jq](https://www.codegenes.net/blog/jq-recursively-merge-objects-and-concatenate-arrays/)
+- [jq 1.8 Manual](https://jqlang.org/manual/)
+- [JQ - Handling null values and default values](https://www.devtoolsdaily.com/blog/jq-null-values-and-default/)
+- [How to Merge JSON Files Using jq: Complete 2026 Guide](https://copyprogramming.com/howto/how-to-merge-json-files-using-jq-or-any-tool)
 
-**Verification recommended:**
-- Check VS Code devcontainer.json schema for new features (official docs)
-- Verify Docker Desktop WSL2 integration behavior (official docs)
-- Validate GSD framework path discovery implementation (source code)
+### Bash Scripting Pitfalls
+- [BashPitfalls - Greg's Wiki](https://mywiki.wooledge.org/BashPitfalls)
+- [glob - Greg's Wiki](https://mywiki.wooledge.org/glob)
+- [Quotes and escaping - The Bash Hackers Wiki](https://flokoe.github.io/bash-hackers-wiki/syntax/quoting/)
+- [Bash Scripting: The Complete Guide for 2026](https://devtoolbox.dedyn.io/blog/bash-scripting-complete-guide)
 
-**Limitations:**
-- No access to official devcontainer spec updates from 2025-2026
-- WSL2 path translation behavior may have changed in recent Docker Desktop versions
-- GSD framework internals not verified (assumed standard path resolution)
+### Atomic Write and File Operations
+- [How to Atomic Create a File If Not Exists in Bash Script](https://linuxvox.com/blog/atomic-create-file-if-not-exists-from-bash-script/)
+- [BashFAQ/062 - Greg's Wiki](https://mywiki.wooledge.org/BashFAQ/062)
+- [How to write idempotent Bash scripts](https://arslan.io/2019/07/03/how-to-write-idempotent-bash-scripts/)
+
+### Plugin and Hook Systems
+- [GitHub - progrium/pluginhook](https://github.com/progrium/pluginhook)
+- [The WordPress Hook Priority System Is Why Your Tracking Plugins Fight](https://seresa.io/blog/marketing-pixels-tags/the-wordpress-hook-priority-system-is-why-your-tracking-plugins-fight)
+- [Automate workflows with hooks - Claude Code Docs](https://code.claude.com/docs/en/hooks-guide)
+
+### Token Replacement and Escaping
+- [Quotes and escaping - The Bash Hackers Wiki](https://bash-hackers.gabe565.com/syntax/quoting/)
+- [Gotchas and Tricks - CLI text processing with GNU sed](https://learnbyexample.github.io/learn_gnused/gotchas-and-tricks.html)
+
+---
+*Pitfalls research for: Plugin system integration into bash install script*
+*Researched: 2026-02-15*
