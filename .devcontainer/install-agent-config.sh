@@ -35,6 +35,7 @@ GIT_IDENTITY_STATUS="not set"
 MCP_COUNT=0
 GSD_COMMANDS=0
 GSD_AGENTS=0
+COMMANDS_COUNT=0
 
 # Load config.json (or use defaults)
 if [ -f "$CONFIG_FILE" ]; then
@@ -213,17 +214,26 @@ fi
     echo 'approval_policy = "never"'
     echo 'sandbox_mode = "danger-full-access"'
     echo ""
+    echo '[features]'
+    echo 'skills = true'
+    echo ""
     echo '[projects."/workspace"]'
     echo 'trust_level = "trusted"'
 } > /home/node/.codex/config.toml
 echo "[install] Generated Codex config.toml (model: $CODEX_MODEL)"
 
-# Copy skills from agent-config to runtime location (AGT-03)
+# Copy skills from agent-config to runtime location (AGT-03) - Cross-agent support
 SKILLS_COUNT=0
 if [ -d "$AGENT_CONFIG_DIR/skills" ]; then
+    # Create Codex skills directory
+    mkdir -p /home/node/.codex/skills
+
+    # Copy to both Claude and Codex
     cp -r "$AGENT_CONFIG_DIR/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
+    cp -r "$AGENT_CONFIG_DIR/skills/"* /home/node/.codex/skills/ 2>/dev/null || true
+
     SKILLS_COUNT=$(find "$AGENT_CONFIG_DIR/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
-    echo "[install] Copied $SKILLS_COUNT skill(s) to $CLAUDE_DIR/skills/"
+    echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 fi
 
 # Copy hooks from agent-config to runtime location (AGT-04)
@@ -232,6 +242,31 @@ if [ -d "$AGENT_CONFIG_DIR/hooks" ]; then
     cp "$AGENT_CONFIG_DIR/hooks/"* "$CLAUDE_DIR/hooks/" 2>/dev/null || true
     HOOKS_COUNT=$(find "$AGENT_CONFIG_DIR/hooks" -maxdepth 1 -type f 2>/dev/null | wc -l)
     echo "[install] Copied $HOOKS_COUNT hook(s) to $CLAUDE_DIR/hooks/"
+fi
+
+# Copy standalone commands from agent-config to runtime location
+COMMANDS_COUNT=0
+if [ -d "$AGENT_CONFIG_DIR/commands" ]; then
+    for cmd_file in "$AGENT_CONFIG_DIR/commands/"*.md; do
+        # Skip if no .md files exist
+        [ -f "$cmd_file" ] || continue
+
+        # Get filename
+        cmd_name=$(basename "$cmd_file")
+
+        # Protect GSD namespace (unlikely but safety check)
+        if [ "$cmd_name" = "gsd" ]; then
+            echo "[install] WARNING: Skipping standalone command 'gsd' (reserved for GSD framework)"
+            continue
+        fi
+
+        # Copy to commands directory
+        cp "$cmd_file" "$CLAUDE_DIR/commands/"
+        COMMANDS_COUNT=$((COMMANDS_COUNT + 1))
+    done
+    if [ $COMMANDS_COUNT -gt 0 ]; then
+        echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
+    fi
 fi
 
 # Generate settings.local.json from template
@@ -415,7 +450,8 @@ echo "[install] Settings: generated"
 echo "[install] Credentials (Claude): $CREDS_STATUS"
 echo "[install] Credentials (Codex): $CODEX_CREDS_STATUS"
 echo "[install] Git identity: $GIT_IDENTITY_STATUS"
-echo "[install] Skills: $SKILLS_COUNT skill(s)"
+echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
+echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
 echo "[install] MCP: $MCP_COUNT server(s)"
 echo "[install] Infra .env: $INFRA_ENV_STATUS"
