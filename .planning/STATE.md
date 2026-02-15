@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 4 of 7 (Core Plugin System)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-02-15 — Roadmap created for v1.2 milestone
+Plan: 1 of 3 in current phase
+Status: Executing
+Last activity: 2026-02-15 — Completed 04-01-PLAN.md
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -24,23 +24,15 @@ Progress: [░░░░░░░░░░] 0%
 - Total execution time: ~22 min
 
 **v1.2 Velocity:**
-- Total plans completed: 0
-- Average duration: N/A
-- Total execution time: 0.0 hours
+- Total plans completed: 1
+- Average duration: 1.1 min
+- Total execution time: 0.02 hours
 
-**By Phase (v1):**
+**By Phase (v1.2):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Configuration Consolidation | 2 | 3 min | 1.5 min |
-| 2. Directory Dissolution | 2 | 11 min | 5.5 min |
-| 3. Runtime Generation & Cut-Over | 2 | 8 min | 4 min |
-
-**Recent Trend:**
-- Last 5 plans: None yet for v1.2
-- Trend: N/A
-
-*Updated after each plan completion*
+| 4. Core Plugin System | 1 | 1.1 min | 1.1 min |
 
 ## Accumulated Context
 
@@ -49,7 +41,9 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- No decisions logged yet for v1.2 milestone
+- [Phase 04-01]: GSD namespace protection for standalone commands (skip any command named gsd)
+- [Phase 04-01]: Skills copied to both Claude and Codex directories for cross-agent support
+- [Phase 04-01]: Codex config.toml includes [features] skills = true for skill discovery
 
 ### Pending Todos
 
@@ -62,8 +56,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-core-plugin-system/04-CONTEXT.md
+Stopped at: Completed 04-01-PLAN.md
+Resume file: .planning/phases/04-core-plugin-system/04-01-SUMMARY.md
 
 ---
 *State updated: 2026-02-15 for milestone v1.2*
