@@ -36,10 +36,12 @@ This milestone adds a plugin system that extends the container's configuration-a
   4. Plugin environment variables from manifests merge correctly with config.json overrides taking precedence
   5. Standalone commands from `agent-config/commands/` are available in Claude Code
   6. User can disable a plugin via `config.json` and its files/registrations are fully skipped
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Standalone commands copy + cross-agent skills + Codex config
+- [ ] 04-02-PLAN.md — Plugin discovery, validation, and file copying with GSD protection
+- [ ] 04-03-PLAN.md — Hook/env registration merging + install summary update
 
 #### Phase 5: MCP Integration
 **Goal**: Plugin MCP servers persist across container rebuilds and token placeholders are hydrated
@@ -90,7 +92,7 @@ Phases execute in numeric order: 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. Core Plugin System | 0/? | Not started | - |
+| 4. Core Plugin System | 0/3 | Planned | - |
 | 5. MCP Integration | 0/? | Not started | - |
 | 6. Langfuse Migration | 0/? | Not started | - |
 | 7. Enhanced Validation | 0/? | Not started | - |
