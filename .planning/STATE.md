@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** All container configuration is generated from source files checked into the repo — no host bind mounts, no scattered settings, no manual file placement.
-**Current focus:** v1 milestone complete and archived. Ready for next milestone.
+**Current focus:** v1.2 — Plugins & Proper Skills/Commands
 
 ## Current Position
 
-Phase: None — milestone v1 complete
-Plan: None
-Status: Milestone archived
-Last activity: 2026-02-15 — v1 archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-15 — Milestone v1.2 started
 
-Progress: Milestone complete
+Progress:░░░░░░░░░░ 0%
 
 ## Performance Metrics
 

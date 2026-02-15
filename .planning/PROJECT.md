@@ -37,12 +37,19 @@ The sandbox is a VS Code devcontainer running on Windows 11 via WSL2/Docker Desk
 1. `.mcp.json` overwrite — mcp-setup in postStartCommand overwrites install-agent-config.sh output (low severity, only affects multi-server configs)
 2. Plugin compatibility — plugin MCP server domains need manual addition to config.json extra_domains
 
-## Next Milestone Goals
+## Current Milestone: v1.2 Plugins & Proper Skills/Commands
 
-To be defined with `/gsd:new-milestone`. Candidates:
-- Multi-model orchestration (Codex CLI, Gemini CLI integration)
-- Plugin ecosystem support
-- .mcp.json generation consolidation
+**Goal:** Add a plugin system with self-registering hooks/env/MCP, standalone commands support, and migrate langfuse to plugin as proof-of-concept.
+
+**Target features:**
+- Plugin system — `agent-config/plugins/` with `plugin.json` manifests, hook/env/MCP registration, config.json control
+- Standalone commands — `agent-config/commands/*.md` copied to `~/.claude/commands/`
+- Langfuse plugin migration — Move langfuse hook from standalone to `plugins/langfuse-tracing/`
+- Install script integration — Plugin install, merge hooks/env/MCP into settings, correct ordering
+
+### Active Requirements
+
+See `.planning/REQUIREMENTS.md` for full scoped requirements.
 
 ## Context
 
@@ -67,4 +74,4 @@ See [v1 Roadmap Archive](.planning/milestones/v1-ROADMAP.md) and [v1 Requirement
 </details>
 
 ---
-*Last updated: 2026-02-15 after v1 milestone completion*
+*Last updated: 2026-02-15 after v1.2 milestone start*
