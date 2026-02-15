@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Configuration Consolidation** - Establish config foundation with secrets isolation
 - [x] **Phase 2: Directory Dissolution** - Restructure directories and resolve path dependencies
-- [ ] **Phase 3: Runtime Generation & Cut-Over** - Remove bind mount (first, isolated), then implement full config automation
+- [x] **Phase 3: Runtime Generation & Cut-Over** - Remove bind mount (first, isolated), then implement full config automation
 
 ## Phase Details
 
@@ -80,10 +80,11 @@ Plans:
   6. save-secrets helper captures live credentials back into secrets.json for backup
   7. Skills and hooks load correctly from container-local ~/.claude/ paths
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 03-01: [To be planned]
+- [x] 03-01-PLAN.md — Remove bind mount, copy agent assets (skills/hooks/commands), add placeholder handling
+- [x] 03-02-PLAN.md — Generate firewall domains and VS Code settings from config.json, credential persistence tooling
 
 ## Progress
 
@@ -94,4 +95,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Configuration Consolidation | 2/2 | ✓ Complete | 2026-02-14 |
 | 2. Directory Dissolution | 2/2 | ✓ Complete | 2026-02-14 |
-| 3. Runtime Generation & Cut-Over | 0/TBD | Not started | - |
+| 3. Runtime Generation & Cut-Over | 2/2 | ✓ Complete | 2026-02-14 |

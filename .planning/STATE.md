@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** All container configuration is generated from source files checked into the repo — no host bind mounts, no scattered settings, no manual file placement.
-**Current focus:** Phase 2 complete — ready for Phase 3 (Runtime Generation & Cut-Over)
+**Current focus:** All 3 phases complete — milestone finished
 
 ## Current Position
 
-Phase: 2 of 3 (Directory Dissolution)
+Phase: 3 of 3 (Runtime Generation & Cut-Over)
 Plan: 2 of 2
-Status: Complete — verified (15/15 checks passed)
-Last activity: 2026-02-14 — Phase 2 executed and verified
+Status: Complete — verified (14/14 requirements passed)
+Last activity: 2026-02-14 — Phase 3 executed and verified
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 6
 - Average duration: 3.5 min
-- Total execution time: 0.23 hours
+- Total execution time: ~0.35 hours
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 1. Configuration Consolidation | 2 | 3 min | 1.5 min |
 | 2. Directory Dissolution | 2 | 11 min | 5.5 min |
+| 3. Runtime Generation & Cut-Over | 2 | 8 min | 4 min |
 
 **Recent Trend:**
-- Last completed: 02-02 (6 min)
-- Trend: Phase 2 complete (2 plans, 11 min total)
+- Last completed: 03-02 (~5 min)
+- Trend: All phases complete (6 plans, ~22 min total)
 
 *Updated after each plan completion*
 
@@ -73,6 +74,19 @@ Recent decisions affecting current work:
 - Scripts use ${LANGFUSE_STACK_DIR:-/workspace/infra} pattern with fallback for sh compatibility
 - README.md Project Structure tree and Key Paths table completely overhauled
 
+**From 03-01 execution:**
+- Bind mount removal isolated as first commit for easy revert if auth breaks
+- langfuse_hook.py duplicated in agent-config/hooks/ (for install pipeline) and infra/hooks/ (for standalone setup)
+- cp -rn for commands protects GSD's 29 commands from being overwritten by custom commands
+- Unresolved {{PLACEHOLDER}} tokens detected, replaced with empty strings, and warned about
+
+**From 03-02 execution:**
+- CORE_DOMAINS array (27 domains) in install script replaces hardcoded DOMAINS in refresh-firewall-dns.sh
+- .vscode/settings.json removed from git tracking, now generated and gitignored
+- save-secrets helper installed to PATH via Dockerfile COPY+RUN pattern
+- API keys persisted via ~/.claude-api-env file sourced by .bashrc and .zshrc
+- generate-env.sh writes Langfuse project keys back to secrets.json after interactive credential generation
+
 ### Pending Todos
 
 None.
@@ -91,12 +105,12 @@ None.
 - RESOLVED: Skill classification — aa-cloudflare and aa-fullstack are custom forked skills, not vendor packages
 
 **Phase 3 (Runtime Generation):**
-- Template hydration — must handle missing placeholders gracefully (warnings, not failures)
-- Build continuity — bind mount removal is point of no return, everything must work before this step
-- Plugin compatibility — Claude Code plugins bundle their own `.mcp.json` (loaded independently of workspace `.mcp.json`). Firewall generation (GEN-01) must account for domains that plugin MCP servers need. Plugin stdio MCP servers need binaries in the Dockerfile. Plugins installed at runtime need persistence across rebuilds (postCreateCommand or version-controlled plugin dirs).
+- RESOLVED: Template hydration — unresolved placeholders detected and replaced with empty strings + warnings
+- RESOLVED: Build continuity — bind mount removal isolated as first commit for easy revert
+- DEFERRED: Plugin compatibility — users can add plugin MCP server domains to config.json extra_domains
 
 ## Session Continuity
 
-Last session: 2026-02-14 (phase 2 execution + verification)
-Stopped at: Phase 2 complete — 15/15 verification checks passed, ready for Phase 3
+Last session: 2026-02-14 (phase 3 execution + verification)
+Stopped at: All phases complete — milestone finished
 Resume file: None
