@@ -36,6 +36,11 @@ MCP_COUNT=0
 GSD_COMMANDS=0
 GSD_AGENTS=0
 COMMANDS_COUNT=0
+PLUGIN_INSTALLED=0
+PLUGIN_SKIPPED=0
+PLUGIN_HOOKS='{}'
+PLUGIN_ENV='{}'
+PLUGIN_WARNINGS=0
 
 # Load config.json (or use defaults)
 if [ -f "$CONFIG_FILE" ]; then
@@ -285,6 +290,61 @@ fi
 if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
     jq -n '{"permissions":{"allow":[],"deny":[],"additionalDirectories":[],"defaultMode":"bypassPermissions"}}' \
         > "$CLAUDE_DIR/settings.json"
+fi
+
+# --- Plugin Installation ---
+if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
+    for plugin_dir in "$AGENT_CONFIG_DIR/plugins"/*/; do
+        # Guard against empty directory
+        [ -d "$plugin_dir" ] || continue
+
+        plugin_name=$(basename "$plugin_dir")
+        MANIFEST="$plugin_dir/plugin.json"
+
+        # Reset per-plugin counters
+        plugin_skills=0
+        plugin_hooks_count=0
+        plugin_cmds=0
+        plugin_agents=0
+
+        # Check if plugin is enabled in config.json (default: true)
+        plugin_enabled="true"
+        if [ -f "$CONFIG_FILE" ]; then
+            plugin_enabled=$(jq -r --arg name "$plugin_name" '.plugins[$name].enabled // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
+        fi
+
+        # Skip if disabled
+        if [ "$plugin_enabled" = "false" ]; then
+            echo "[install] Plugin '$plugin_name': skipped (disabled)"
+            PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
+            continue
+        fi
+
+        # Validate plugin.json exists
+        if [ ! -f "$MANIFEST" ]; then
+            echo "[install] Plugin '$plugin_name': skipped (no plugin.json)"
+            PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
+            continue
+        fi
+
+        # Validate plugin.json is valid JSON
+        if ! validate_json "$MANIFEST" "plugins/$plugin_name/plugin.json"; then
+            PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
+            continue
+        fi
+
+        # Validate plugin name matches directory name
+        manifest_name=$(jq -r '.name // ""' "$MANIFEST" 2>/dev/null)
+        if [ "$manifest_name" != "$plugin_name" ]; then
+            echo "[install] WARNING: Plugin '$plugin_name' manifest name '$manifest_name' does not match directory name — skipping"
+            PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+            PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
+            continue
+        fi
+
+        # Plugin is valid and enabled — proceed to file copying (Task 2)
+
+    done
 fi
 
 # Restore Claude credentials (if available)
