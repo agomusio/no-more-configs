@@ -39,10 +39,12 @@
             "path": "zsh"
           }
         },
-        "telemetry.telemetryLevel": "off"
+        "telemetry.telemetryLevel": "off",
+        "claude-code.terminalEnvironment": false
       }
     }
   },
+  "unwantedExtensions": ["Anthropic.claude-code"],
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",

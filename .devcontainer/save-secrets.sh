@@ -46,10 +46,21 @@ else
     echo "[save-secrets] Codex credentials: not found (run 'codex' to authenticate)"
 fi
 
-# Capture Langfuse keys from settings
+# Capture Langfuse keys (try settings.local.json first, fall back to infra/.env)
+LF_PK=""
+LF_SK=""
 if [ -f "$CLAUDE_DIR/settings.local.json" ]; then
     LF_PK=$(jq -r '.env.LANGFUSE_PUBLIC_KEY // ""' "$CLAUDE_DIR/settings.local.json" 2>/dev/null || echo "")
     LF_SK=$(jq -r '.env.LANGFUSE_SECRET_KEY // ""' "$CLAUDE_DIR/settings.local.json" 2>/dev/null || echo "")
+fi
+# Fall back to infra/.env if settings.local.json didn't have them
+INFRA_ENV="/workspace/infra/.env"
+if [ -z "$LF_SK" ] && [ -f "$INFRA_ENV" ]; then
+    LF_PK=$(grep -oP '^LANGFUSE_INIT_PROJECT_PUBLIC_KEY=\K.*' "$INFRA_ENV" 2>/dev/null || echo "pk-lf-local-claude-code")
+    LF_SK=$(grep -oP '^LANGFUSE_INIT_PROJECT_SECRET_KEY=\K.*' "$INFRA_ENV" 2>/dev/null || echo "")
+    [ -z "$LF_PK" ] && LF_PK="pk-lf-local-claude-code"
+fi
+if [ -n "$LF_PK" ] || [ -n "$LF_SK" ]; then
     if [ -n "$LF_PK" ]; then
         SECRETS=$(echo "$SECRETS" | jq --arg pk "$LF_PK" '.langfuse.public_key = $pk')
     fi

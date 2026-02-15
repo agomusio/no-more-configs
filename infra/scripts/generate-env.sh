@@ -149,7 +149,7 @@ if command -v jq &> /dev/null; then
         jq -n \
             --arg pk "pk-lf-local-claude-code" \
             --arg sk "$PROJECT_SECRET_KEY" \
-            '{"claude":{"credentials":{}},"langfuse":{"public_key":$pk,"secret_key":$sk},"api_keys":{"openai":"","google":""}}' \
+            '{"git":{"name":"","email":""},"claude":{"credentials":{}},"codex":{"auth":{}},"langfuse":{"public_key":$pk,"secret_key":$sk},"api_keys":{"openai":"","google":""}}' \
             > "$SECRETS_FILE"
         echo -e "${GREEN}✓ Created secrets.json with Langfuse project keys${NC}"
     fi

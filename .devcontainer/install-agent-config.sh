@@ -141,6 +141,22 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
 fi
 
+# Generate per-publisher VS Code CDN domains from devcontainer.json extensions
+DEVCONTAINER_JSON="$WORKSPACE_ROOT/.devcontainer/devcontainer.json"
+if [ -f "$DEVCONTAINER_JSON" ]; then
+    PUBLISHERS=$(jq -r '.customizations.vscode.extensions // [] | .[] | split(".")[0]' "$DEVCONTAINER_JSON" 2>/dev/null | sort -u || true)
+    if [ -n "$PUBLISHERS" ]; then
+        {
+            echo ""
+            echo "# VS Code extension publisher CDN domains (auto-generated)"
+            while IFS= read -r pub; do
+                echo "${pub}.gallerycdn.vsassets.io"
+                echo "${pub}.gallery.vsassets.io"
+            done <<< "$PUBLISHERS"
+        } >> "$FIREWALL_CONF"
+    fi
+fi
+
 DOMAIN_COUNT=$(grep -c '^[^#]' "$FIREWALL_CONF" | tr -d '[:space:]')
 echo "[install] Generated firewall-domains.conf with $DOMAIN_COUNT domain(s)"
 
@@ -237,21 +253,11 @@ else
     echo "[install] WARNING: settings.json.template not found — skipping settings generation"
 fi
 
-# Enable bypassPermissions globally so bare `claude` runs without permission prompts.
-# This is the container-local equivalent of --dangerously-skip-permissions.
-# It can be toggled off per-session with `claude --no-dangerously-skip-permissions`.
+# Seed settings.json with permissions so GSD installer has a valid file to merge into.
+# Final settings enforcement happens AFTER GSD installation (which modifies this file).
 if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
-    jq -n '{
-        "permissions":{"allow":[],"deny":[],"additionalDirectories":[],"defaultMode":"bypassPermissions"},
-        "effortLevel":"high"
-    }' > "$CLAUDE_DIR/settings.json"
-    echo "[install] Generated settings.json (bypassPermissions, effortLevel: high)"
-else
-    # Ensure bypassPermissions and effortLevel are set even if settings.json already exists
-    jq '.permissions.defaultMode = "bypassPermissions" | .effortLevel = "high"' \
-        "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
-        && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
-    echo "[install] Updated settings.json (bypassPermissions, effortLevel: high)"
+    jq -n '{"permissions":{"allow":[],"deny":[],"additionalDirectories":[],"defaultMode":"bypassPermissions"}}' \
+        > "$CLAUDE_DIR/settings.json"
 fi
 
 # Restore Claude credentials (if available)
@@ -264,13 +270,18 @@ if [ -f "$SECRETS_FILE" ]; then
         CREDS_STATUS="restored"
         echo "[install] Claude credentials restored"
 
-        # Mark onboarding complete and skip bypass-permissions confirmation
+        # Mark onboarding complete, dismiss effort callout, prevent VS Code extension auto-install
         CLAUDE_JSON="/home/node/.claude.json"
         if [ ! -f "$CLAUDE_JSON" ]; then
-            jq -n '{"hasCompletedOnboarding": true, "skipDangerousModePermissionPrompt": true, "theme": "dark"}' \
-                > "$CLAUDE_JSON"
+            jq -n '{
+                "hasCompletedOnboarding": true,
+                "theme": "dark",
+                "effortCalloutDismissed": true,
+                "officialMarketplaceAutoInstallAttempted": true,
+                "officialMarketplaceAutoInstalled": true
+            }' > "$CLAUDE_JSON"
         else
-            jq '.hasCompletedOnboarding = true | .skipDangerousModePermissionPrompt = true' \
+            jq '.hasCompletedOnboarding = true | .effortCalloutDismissed = true | .officialMarketplaceAutoInstallAttempted = true | .officialMarketplaceAutoInstalled = true' \
                 "$CLAUDE_JSON" > "$CLAUDE_JSON.tmp" \
                 && mv "$CLAUDE_JSON.tmp" "$CLAUDE_JSON"
         fi
@@ -398,6 +409,13 @@ else
         GSD_AGENTS=0
     fi
 fi
+
+# Enforce required settings.json values AFTER GSD (which modifies the file).
+# This is the last write to settings.json — bypassPermissions, model, effort, skip prompt.
+jq '.permissions.defaultMode = "bypassPermissions" | .effortLevel = "high" | .model = "opus" | .skipDangerousModePermissionPrompt = true' \
+    "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+    && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+echo "[install] Enforced settings.json (bypassPermissions, opus, effortLevel: high)"
 
 # Print summary
 echo "[install] --- Summary ---"

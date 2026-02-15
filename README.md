@@ -1,15 +1,16 @@
 # No More Configs
 
-No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding with Claude Code and other models. Langfuse observability, MCP gateway, GSD workflow framework, iptables firewall — all configured from two files at the repo root. No host dependencies, no scattered config, no yak shaving.
+No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models. Langfuse observability, MCP gateway, GSD workflow framework, iptables firewall — all configured from two files at the repo root. No host dependencies, no scattered config, no yak shaving.
 
 ```
 You                         Container
  │                           ├── Claude Code CLI + Codex CLI
  ├── config.json ──────────► ├── Firewall domains
  │   (settings)              ├── VS Code settings
- │                           ├── MCP gateway config
+ │                           ├── MCP server config
  ├── secrets.json ─────────► ├── Claude + Codex auth tokens
- │   (credentials)           ├── Langfuse tracing keys
+ │   (credentials)           ├── Git identity
+ │                           ├── Langfuse tracing keys
  │                           └── API key exports
  │
  └── Open in Container ────► Done.
@@ -17,10 +18,11 @@ You                         Container
 
 ## What You Get
 
-- **Claude Code** (latest) with custom skills and hooks pre-installed
-- **Codex CLI** (latest) — OpenAI's agentic coding CLI (GPT-5.3-Codex)
-- **Langfuse** self-hosted observability — every conversation traced to a local dashboard
+- **Claude Code** (latest) — Anthropic's agentic coding CLI, pre-configured with bypass permissions, Opus model, high effort
+- **Codex CLI** (latest) — OpenAI's agentic coding CLI (GPT-5.3-Codex), pre-configured with full-auto mode
+- **Langfuse** self-hosted observability — every conversation traced to a local dashboard (optional)
 - **MCP gateway** for Model Context Protocol tool access
+- **Codex MCP server** — lets Claude delegate to Codex mid-session (optional, enable in config.json)
 - **GSD framework** — 28 slash commands and 11 specialized agents for structured development
 - **iptables firewall** — default-deny network with domain whitelist
 - **Oh-My-Zsh** with Powerlevel10k, fzf, git-delta, GitHub CLI
@@ -54,7 +56,14 @@ claude          # Follow OAuth prompts (Claude Pro/Max subscription)
 codex           # Follow OAuth prompts (ChatGPT Plus/Pro subscription)
 ```
 
-After authenticating, capture your credentials so they survive container rebuilds:
+Set your git identity:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
+Then capture everything so it survives container rebuilds:
 
 ```bash
 save-secrets
@@ -66,8 +75,9 @@ If you want conversation tracing:
 
 ```bash
 cd /workspace/infra
-./scripts/generate-env.sh      # Interactive — creates .env with random secrets
+./scripts/generate-env.sh      # Creates .env with random secrets
 sudo docker compose up -d      # Starts all 8 services
+save-secrets                   # Captures Langfuse keys into secrets.json
 ```
 
 Wait 30-60s, then verify at `http://localhost:3052`.
@@ -77,9 +87,9 @@ Wait 30-60s, then verify at `http://localhost:3052`.
 Start coding:
 
 ```bash
-claude                         # Claude Code — permissions bypassed by default
+claude                         # Claude Code (Opus, high effort, permissions bypassed)
 clauder                        # Resume last Claude session
-codex                          # Codex CLI — OpenAI's agentic coding agent
+codex                          # Codex CLI (GPT-5.3-Codex, full-auto mode)
 codexr                         # Resume last Codex session
 ```
 
@@ -97,15 +107,17 @@ Everything is driven by two files at the repo root:
 ```json
 {
   "firewall": { "extra_domains": ["your-api.example.com"] },
+  "codex": { "model": "gpt-5.3-codex" },
   "langfuse": { "host": "http://host.docker.internal:3052" },
   "vscode": { "git_scan_paths": ["gitprojects/my-project"] },
-  "mcp_servers": { "mcp-gateway": { "enabled": true } }
+  "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": false } }
 }
 ```
 
 **`secrets.json`** (gitignored) — credentials:
 ```json
 {
+  "git": { "name": "Your Name", "email": "you@example.com" },
   "claude": { "credentials": { "...auth tokens..." } },
   "codex": { "auth": { "...oauth tokens..." } },
   "langfuse": { "public_key": "pk-...", "secret_key": "sk-..." },
@@ -113,15 +125,27 @@ Everything is driven by two files at the repo root:
 }
 ```
 
-On container creation, `install-agent-config.sh` reads both files and generates all runtime configuration. On container start, the firewall and MCP gateway are initialized from the generated files.
+On container creation, `install-agent-config.sh` reads both files and generates all runtime configuration. On container start, the firewall and MCP servers are initialized from the generated files.
 
 ### Credential Persistence
 
 ```
-authenticate Claude/Codex → save-secrets → secrets.json → rebuild → auto-restored
+authenticate Claude/Codex → set git identity → save-secrets → secrets.json → rebuild → auto-restored
 ```
 
-`save-secrets` captures live Claude credentials, Codex credentials, Langfuse keys, and API keys back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
+`save-secrets` captures live Claude credentials, Codex credentials, git identity, Langfuse keys, and API keys back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
+
+### Pre-configured Defaults
+
+Both CLI agents are pre-configured for container use — no interactive prompts on subsequent starts:
+
+| Setting | Claude Code | Codex CLI |
+|---------|-------------|-----------|
+| **Permissions** | `bypassPermissions` (no prompts) | `approval_policy = "never"` |
+| **Model** | Opus (high effort) | `gpt-5.3-codex` (configurable via `config.json`) |
+| **Sandbox** | N/A (container is the sandbox) | `danger-full-access` |
+| **Credentials** | `~/.claude/.credentials.json` | `~/.codex/auth.json` (file-based, no keyring) |
+| **Onboarding** | Skipped when credentials present | Workspace pre-trusted |
 
 ### Agent Config
 
@@ -130,7 +154,7 @@ The `agent-config/` directory is the version-controlled source of truth:
 - **`settings.json.template`** — Claude Code settings with `{{PLACEHOLDER}}` tokens hydrated from config/secrets
 - **`skills/`** — Custom skills copied to `~/.claude/skills/`
 - **`hooks/`** — Hooks copied to `~/.claude/hooks/`
-- **`mcp-templates/`** — MCP server templates with placeholder hydration
+- **`mcp-templates/`** — MCP server templates (mcp-gateway, codex) with placeholder hydration
 
 Add your own skills by creating a directory under `agent-config/skills/` with a `SKILL.md` file. They'll be installed automatically on rebuild.
 
@@ -165,6 +189,8 @@ Default policy is **DROP**. Only whitelisted domains are reachable.
 
 **Always included** (30 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, OpenAI (API + Auth + Platform + ChatGPT), Google AI API, Cloudflare, and more.
 
+**Auto-generated**: Per-publisher VS Code extension CDN domains are derived from `devcontainer.json` so extensions install without firewall errors.
+
 **User-configured**: Add domains to `config.json → firewall.extra_domains` — they're appended automatically on rebuild.
 
 To temporarily allow a domain inside the container:
@@ -182,15 +208,23 @@ sudo /usr/local/bin/refresh-firewall-dns.sh
 
 ---
 
-## MCP Gateway
+## MCP Servers
 
-The Docker MCP Gateway provides Model Context Protocol server access at `127.0.0.1:8811`.
+MCP servers are managed through templates in `agent-config/mcp-templates/` and enabled in `config.json → mcp_servers`.
 
-- **Gateway config:** `infra/mcp/mcp.json`
-- **Client config:** `.mcp.json` (generated, gitignored)
-- **Default server:** `@modelcontextprotocol/server-filesystem` (workspace root)
+| Server | Template | Description |
+|--------|----------|-------------|
+| `mcp-gateway` | `mcp-gateway.json` | Docker MCP Gateway at `127.0.0.1:8811` |
+| `codex` | `codex.json` | Codex CLI as MCP server — gives Claude access to `codex`, `review`, `listSessions` tools |
 
-To add a server, see [`infra/mcp/SERVERS.md`](infra/mcp/SERVERS.md) for examples.
+Enable a server:
+```json
+{ "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": true } } }
+```
+
+The `mcp-setup` command regenerates `~/.claude/.mcp.json` from enabled templates on every container start.
+
+To add a custom MCP server, create a template in `agent-config/mcp-templates/` and enable it in `config.json`.
 
 ---
 
@@ -218,6 +252,19 @@ tail -50 ~/.claude/state/langfuse_hook.log
 
 ---
 
+## Shell Shortcuts
+
+| Command | Action |
+|---------|--------|
+| `claude` | Claude Code — Opus, high effort, permissions bypassed |
+| `clauder` | Alias for `claude --resume` |
+| `codex` | Codex CLI — GPT-5.3-Codex, full-auto, no sandbox |
+| `codexr` | Alias for `codex --resume` |
+| `save-secrets` | Capture live credentials, git identity, and keys to `secrets.json` |
+| `mcp-setup` | Regenerate `.mcp.json` from templates and health-check MCP gateway |
+
+---
+
 ## Project Structure
 
 ```
@@ -231,7 +278,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │
 ├── agent-config/               # Version-controlled agent config source
 │   ├── settings.json.template  # Settings with {{PLACEHOLDER}} tokens
-│   ├── mcp-templates/          # MCP server templates
+│   ├── mcp-templates/          # MCP server templates (mcp-gateway, codex)
 │   ├── skills/                 # Custom skills
 │   └── hooks/                  # Custom hooks
 │
@@ -260,6 +307,16 @@ Edit `config.json`:
 ```
 
 Rebuild the container to apply.
+
+### Changing the Codex Model
+
+Edit `config.json`:
+
+```json
+{ "codex": { "model": "o4-mini" } }
+```
+
+Rebuild the container. Default is `gpt-5.3-codex`.
 
 ### Adding Skills
 
@@ -318,3 +375,4 @@ Handled automatically. If it recurs: `git config --global --add safe.directory '
 - **Dev Container** — Modified from the official [Claude Code Dev Container](https://github.com/anthropics/claude-code) reference configuration.
 - **Langfuse Stack** — Built from Doneyli de Jesus's [claude-code-langfuse-template](https://github.com/doneyli/claude-code-langfuse-template), as described in [I Built My Own Observability for Claude Code](https://doneyli.substack.com/p/i-built-my-own-observability-for).
 - **GSD Framework** — [Get Shit Done](https://github.com/glittercowboy/get-shit-done) by glittercowboy.
+- **Codex MCP Server** — [codex-mcp-server](https://github.com/tuannvm/codex-mcp-server) by tuannvm.
