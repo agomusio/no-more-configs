@@ -1,0 +1,29 @@
+{
+  "name": "nmc",
+  "version": "1.0.0",
+  "description": "NMC system introspection and diagnostics. Provides /nmc command for system status and nmc-diagnostics agent for troubleshooting plugins, hooks, MCP servers, and container configuration.",
+  "author": {
+    "name": "Sam Boland"
+  },
+  "commands": [
+    {
+      "name": "nmc",
+      "file": "commands/nmc.md",
+      "description": "Show NMC system status — plugins, hooks, MCP servers, env vars, container info"
+    }
+  ],
+  "agents": [
+    {
+      "name": "nmc-diagnostics",
+      "file": "agents/nmc-diagnostics.md",
+      "description": "Troubleshoot NMC system issues — plugins, hooks, MCP, environment"
+    }
+  ],
+  "skills": [
+    {
+      "name": "nmc-system",
+      "file": "skills/nmc-system/SKILL.md",
+      "description": "Static reference knowledge about the NMC devcontainer architecture and plugin system"
+    }
+  ]
+}

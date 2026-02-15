@@ -1,15 +1,17 @@
 ---
-name: devcontainer
-description: No More Configs devcontainer knowledge. Use when the user asks about the devcontainer, Docker setup, container configuration, workspace layout, installed tools, firewall, networking, Langfuse tracing, MCP gateway, mounted volumes, ports, environment variables, shell configuration, or any question about how this development environment is set up.
+name: nmc-system
+description: No More Configs (NMC) system reference. Use when the user asks about the devcontainer, Docker setup, container configuration, workspace layout, installed tools, firewall, networking, Langfuse tracing, MCP gateway, mounted volumes, ports, environment variables, shell configuration, plugin system architecture, how plugins are installed, how hooks are registered, how the install script works, or any question about how this development environment is set up and configured.
 license: MIT
 metadata:
   author: Sam Boland
-  version: "2.0.0"
+  version: "3.0.0"
 ---
 
-# No More Configs — Devcontainer Reference
+# No More Configs — System Reference
 
-Complete reference for the development environment Claude Code runs inside. Use this to answer questions about the container setup, networking, tools, and configuration without searching the filesystem.
+Complete reference for the development environment Claude Code runs inside. Use this to answer questions about the container setup, networking, tools, configuration, and plugin system without searching the filesystem.
+
+For active introspection, use the `/nmc` command. For troubleshooting, the `nmc-diagnostics` agent investigates runtime state.
 
 ## Architecture
 
@@ -17,6 +19,7 @@ Complete reference for the development environment Claude Code runs inside. Use 
 Host (VS Code + Docker Desktop)
  ├── VS Code → Dev Container (Debian/Node 20, user: node)
  │   ├── Claude Code CLI + Codex CLI + custom skills + GSD framework
+ │   ├── NMC plugin system (skills, commands, agents, hooks)
  │   ├── iptables whitelist firewall
  │   └── /var/run/docker.sock (bind-mounted from host)
  │
@@ -38,12 +41,12 @@ All container configuration is driven by two files at the repo root:
 
 | File | Tracked | Purpose |
 |------|---------|---------|
-| `config.json` | Yes | Non-secret settings: firewall domains, Langfuse host, VS Code git scan paths, MCP servers |
+| `config.json` | Yes | Non-secret settings: firewall domains, Langfuse host, VS Code git scan paths, MCP servers, plugin enable/disable |
 | `secrets.json` | No (gitignored) | Credentials: Claude/Codex auth, git identity, infra secrets |
 
 On container creation, `install-agent-config.sh` reads both files and generates:
 - `~/.claude/settings.local.json` (hydrated from `agent-config/settings.json.template`)
-- `~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/commands/` (copied from `agent-config/`)
+- `~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/commands/`, `~/.claude/agents/` (copied from `agent-config/` + plugins)
 - `.devcontainer/firewall-domains.conf` (core domains + `config.json` extras)
 - `.vscode/settings.json` (git scan paths from `config.json` + auto-detected repos)
 - `.mcp.json` (MCP client config from enabled templates)
@@ -60,6 +63,61 @@ secrets.json ← save-secrets ← live container
 ```
 
 `save-secrets` (installed to PATH) captures live Claude credentials, Codex credentials, git identity, and infrastructure secrets back into `secrets.json` for persistence across rebuilds.
+
+## Plugin System
+
+Plugins are bundled packages of skills, commands, agents, and hooks under `agent-config/plugins/`. Each plugin has a `plugin.json` manifest.
+
+### Plugin Structure
+
+```
+agent-config/plugins/my-plugin/
+├── plugin.json           # Required manifest
+├── skills/               # Optional — SKILL.md directories
+├── commands/             # Optional — slash command .md files
+├── agents/               # Optional — agent definition .md files
+└── hooks/                # Optional — hook scripts referenced by plugin.json
+```
+
+### plugin.json Format
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "description": "What this plugin does",
+  "hooks": {
+    "Stop": [{ "type": "command", "command": "bash ~/.claude/hooks/my-hook.sh" }]
+  },
+  "env": { "MY_VAR": "value" }
+}
+```
+
+### Install Flow
+
+On container creation, the install script:
+1. Discovers plugins in `agent-config/plugins/*/`
+2. Checks `config.json` `.plugins.{name}.enabled` (default: true)
+3. Validates `plugin.json` exists and name matches directory
+4. Copies skills → `~/.claude/skills/`, commands → `~/.claude/commands/`, agents → `~/.claude/agents/`, hooks → `~/.claude/hooks/`
+5. Accumulates hook registrations and env vars from all plugins
+6. Merges hooks into `~/.claude/settings.local.json` `.hooks` (appended, not overwritten)
+7. Merges env vars into `~/.claude/settings.local.json` `.env`
+
+### Plugin Control via config.json
+
+```json
+{
+  "plugins": {
+    "my-plugin": { "enabled": false },
+    "other-plugin": { "enabled": true, "env": { "OVERRIDE": "value" } }
+  }
+}
+```
+
+- Not mentioned = enabled by default
+- `enabled: false` = fully skipped (no files copied, no hooks registered)
+- `env` overrides take precedence over plugin.json defaults
 
 ## Workspace Layout
 
@@ -82,10 +140,14 @@ secrets.json ← save-secrets ← live container
 │   ├── settings.json.template  # Claude Code settings with {{PLACEHOLDER}} tokens
 │   ├── mcp-templates/          # MCP server templates
 │   │   └── mcp-gateway.json
-│   ├── skills/                 # Custom skills (copied to ~/.claude/skills/)
-│   │   └── devcontainer/       # This skill
-│   └── hooks/                  # Hooks (copied to ~/.claude/hooks/)
-│       └── langfuse_hook.py    # Langfuse tracing hook
+│   ├── skills/                 # Standalone skills (copied to ~/.claude/skills/)
+│   ├── hooks/                  # Standalone hooks (copied to ~/.claude/hooks/)
+│   │   └── langfuse_hook.py    # Langfuse tracing hook
+│   └── plugins/                # NMC plugins
+│       ├── nmc/                # System introspection & diagnostics
+│       ├── ralph-wiggum/       # Self-referential loop technique
+│       ├── plugin-dev/         # Plugin development toolkit
+│       └── frontend-design/    # Frontend design skills
 │
 ├── config.json                 # Master non-secret settings
 │
@@ -105,9 +167,9 @@ secrets.json ← save-secrets ← live container
 
 | Path | Purpose |
 |------|---------|
-| `/workspace/config.json` | Master settings (firewall, langfuse, vscode, mcp) |
+| `/workspace/config.json` | Master settings (firewall, langfuse, vscode, mcp, plugins) |
 | `/workspace/secrets.json` | Credentials (Claude auth, Codex auth, infra secrets) — gitignored |
-| `/workspace/agent-config/` | Version-controlled templates, skills, hooks |
+| `/workspace/agent-config/` | Version-controlled templates, skills, hooks, plugins |
 | `/home/node/.claude/` | Container-local Claude config (generated at build time) |
 | `/home/node/.codex/` | Codex CLI config and credentials |
 | `/home/node/.codex/config.toml` | Codex config (file-based credential store) |
@@ -115,7 +177,8 @@ secrets.json ← save-secrets ← live container
 | `/home/node/.claude/commands/gsd/` | GSD slash commands (~28 commands) |
 | `/home/node/.claude/agents/gsd-*.md` | GSD specialized agents (11 agents) |
 | `/home/node/.claude/hooks/langfuse_hook.py` | Langfuse tracing hook |
-| `/home/node/.claude/settings.local.json` | Generated settings (Langfuse env, hooks) |
+| `/home/node/.claude/settings.local.json` | Generated settings (hooks, env vars) |
+| `/home/node/.claude/.mcp.json` | MCP server configuration |
 | `/usr/local/bin/save-secrets` | Credential capture helper |
 | `/usr/local/bin/langfuse-setup` | Langfuse stack setup (generate secrets, start, verify) |
 | `/usr/local/bin/init-firewall.sh` | Firewall script |
@@ -182,13 +245,14 @@ secrets.json ← save-secrets ← live container
 | `codexr` | Alias for `codex --resume` |
 | `save-secrets` | Capture live credentials to secrets.json |
 | `langfuse-setup` | Generate secrets, start Langfuse stack, verify health |
-| `mcp-setup` | Regenerate .mcp.json and health-check MCP gateway |
+| `mcp-setup` | Regenerate .mcp.json + gateway health check |
 
 ## Hooks
 
 | Event | Script | Purpose |
 |-------|--------|---------|
 | **Stop** | `python3 /home/node/.claude/hooks/langfuse_hook.py` | Send conversation traces to Langfuse |
+| **Stop** | `bash /home/node/.claude/hooks/stop-hook.sh` | Ralph Wiggum loop continuation |
 | **SessionStart** | `node /home/node/.claude/hooks/gsd-check-update.js` | Check for GSD framework updates |
 | **StatusLine** | `node /home/node/.claude/hooks/gsd-statusline.js` | Show GSD state in terminal status line |
 
@@ -214,7 +278,8 @@ To permanently add: edit `config.json → firewall.extra_domains` and rebuild.
 | Source | Target | Type | Purpose |
 |--------|--------|------|---------|
 | Host Docker socket | `/var/run/docker.sock` | Bind | Docker-outside-of-Docker |
-| `claude-code-bashhistory-*` | `/commandhistory` | Volume | Shell history persists across rebuilds |
+| `claude-code-bashhistory` | `/commandhistory` | Volume | Shell history persists across rebuilds |
+| `claude-code-conversations` | `/home/node/.claude/projects` | Volume | Conversation data persists across rebuilds |
 | Workspace | `/workspace` | Bind | Delegated consistency |
 
 Note: No `~/.claude` bind mount. All Claude config is generated container-locally by `install-agent-config.sh`.
@@ -224,7 +289,7 @@ Note: No `~/.claude` bind mount. All Claude config is generated container-locall
 ### postCreateCommand (first build only)
 
 1. `setup-container.sh` — Docker socket perms, git config
-2. `install-agent-config.sh` — Reads config.json + secrets.json, generates all runtime config, installs skills/hooks/commands, installs GSD framework
+2. `install-agent-config.sh` — Reads config.json + secrets.json, generates all runtime config, installs skills/hooks/commands, installs plugins, installs GSD framework
 
 ### postStartCommand (every start)
 

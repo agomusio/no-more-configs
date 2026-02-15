@@ -47,8 +47,8 @@
   "unwantedExtensions": ["Anthropic.claude-code"],
   "remoteUser": "node",
   "mounts": [
-    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
-    "source=claude-code-conversations-${devcontainerId},target=/home/node/.claude/projects,type=volume",
+    "source=claude-code-bashhistory,target=/commandhistory,type=volume",
+    "source=claude-code-conversations,target=/home/node/.claude/projects,type=volume",
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "containerEnv": {
