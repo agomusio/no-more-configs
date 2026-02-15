@@ -234,14 +234,6 @@ if [ -d "$AGENT_CONFIG_DIR/hooks" ]; then
     echo "[install] Copied $HOOKS_COUNT hook(s) to $CLAUDE_DIR/hooks/"
 fi
 
-# Copy commands from agent-config, non-destructive — don't overwrite GSD (AGT-05)
-COMMANDS_COUNT=0
-if [ -d "$AGENT_CONFIG_DIR/commands" ]; then
-    cp -rn "$AGENT_CONFIG_DIR/commands/"* "$CLAUDE_DIR/commands/" 2>/dev/null || true
-    COMMANDS_COUNT=$(find "$AGENT_CONFIG_DIR/commands" -maxdepth 1 -mindepth 1 2>/dev/null | wc -l)
-    echo "[install] Copied $COMMANDS_COUNT command source(s) to $CLAUDE_DIR/commands/ (non-destructive)"
-fi
-
 # Generate settings.local.json from template
 if [ -f "$SETTINGS_TEMPLATE" ]; then
     sed -e "s|{{LANGFUSE_HOST}}|$LANGFUSE_HOST|g" \
@@ -278,10 +270,11 @@ if [ -f "$SECRETS_FILE" ]; then
                 "theme": "dark",
                 "effortCalloutDismissed": true,
                 "officialMarketplaceAutoInstallAttempted": true,
-                "officialMarketplaceAutoInstalled": true
+                "officialMarketplaceAutoInstalled": true,
+                "hasIdeOnboardingBeenShown": {"vscode": true}
             }' > "$CLAUDE_JSON"
         else
-            jq '.hasCompletedOnboarding = true | .effortCalloutDismissed = true | .officialMarketplaceAutoInstallAttempted = true | .officialMarketplaceAutoInstalled = true' \
+            jq '.hasCompletedOnboarding = true | .effortCalloutDismissed = true | .officialMarketplaceAutoInstallAttempted = true | .officialMarketplaceAutoInstalled = true | .hasIdeOnboardingBeenShown.vscode = true' \
                 "$CLAUDE_JSON" > "$CLAUDE_JSON.tmp" \
                 && mv "$CLAUDE_JSON.tmp" "$CLAUDE_JSON"
         fi
@@ -424,7 +417,6 @@ echo "[install] Credentials (Codex): $CODEX_CREDS_STATUS"
 echo "[install] Git identity: $GIT_IDENTITY_STATUS"
 echo "[install] Skills: $SKILLS_COUNT skill(s)"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
-echo "[install] Commands: $COMMANDS_COUNT command source(s)"
 echo "[install] MCP: $MCP_COUNT server(s)"
 echo "[install] Infra .env: $INFRA_ENV_STATUS"
 echo "[install] GSD: $GSD_COMMANDS commands + $GSD_AGENTS agents"

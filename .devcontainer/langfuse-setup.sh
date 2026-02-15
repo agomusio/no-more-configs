@@ -87,6 +87,7 @@ generate_secrets() {
         --arg ch "$ch_pass" \
         --arg minio "$minio_pass" \
         --arg redis "$redis_auth" \
+        --arg sk "$lf_sk" \
         --arg email "$user_email" \
         --arg name "$user_name" \
         --arg pass "$user_pass" \

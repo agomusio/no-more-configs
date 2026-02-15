@@ -39,7 +39,7 @@ All container configuration is driven by two files at the repo root:
 | File | Tracked | Purpose |
 |------|---------|---------|
 | `config.json` | Yes | Non-secret settings: firewall domains, Langfuse host, VS Code git scan paths, MCP servers |
-| `secrets.json` | No (gitignored) | Credentials: Claude auth tokens, Langfuse keys, API keys |
+| `secrets.json` | No (gitignored) | Credentials: Claude/Codex auth, git identity, infra secrets |
 
 On container creation, `install-agent-config.sh` reads both files and generates:
 - `~/.claude/settings.local.json` (hydrated from `agent-config/settings.json.template`)
@@ -49,7 +49,7 @@ On container creation, `install-agent-config.sh` reads both files and generates:
 - `.mcp.json` (MCP client config from enabled templates)
 - `~/.claude/.credentials.json` (restored from `secrets.json`)
 - `~/.codex/auth.json` (restored from `secrets.json`)
-- `~/.claude-api-env` (API key exports sourced by shell)
+- `infra/.env` (generated from `secrets.json` infra section via `langfuse-setup --generate-env`)
 
 ### Credential Round-Trip
 
@@ -59,7 +59,7 @@ secrets.json → install-agent-config.sh → runtime files
 secrets.json ← save-secrets ← live container
 ```
 
-`save-secrets` (installed to PATH) captures live Claude credentials, Codex credentials, Langfuse keys, and API keys back into `secrets.json` for persistence across rebuilds.
+`save-secrets` (installed to PATH) captures live Claude credentials, Codex credentials, git identity, and infrastructure secrets back into `secrets.json` for persistence across rebuilds.
 
 ## Workspace Layout
 
@@ -72,6 +72,7 @@ secrets.json ← save-secrets ← live container
 │   ├── init-firewall.sh        # iptables whitelist (runs on every start)
 │   ├── refresh-firewall-dns.sh # DNS refresh for firewall domains
 │   ├── save-secrets.sh         # Credential capture helper (installed to PATH)
+│   ├── langfuse-setup.sh       # Langfuse stack setup (installed to PATH as langfuse-setup)
 │   ├── init-gsd.sh             # GSD framework installer
 │   ├── setup-container.sh      # Post-create setup (git config, Docker socket)
 │   ├── setup-network-checks.sh # Langfuse pip install + connectivity checks
@@ -87,16 +88,13 @@ secrets.json ← save-secrets ← live container
 │       └── langfuse_hook.py    # Langfuse tracing hook
 │
 ├── config.json                 # Master non-secret settings
-├── config.example.json         # Schema reference with sensible defaults
-├── secrets.example.json        # Credential schema reference
 │
 ├── infra/                      # Langfuse + MCP gateway infrastructure
 │   ├── docker-compose.yml      # 8-service stack
-│   ├── .env                    # Generated credentials (gitignored)
+│   ├── .env                    # Generated from secrets.json by langfuse-setup (gitignored)
+│   ├── data/                   # Persistent bind mounts: postgres, clickhouse, minio (gitignored)
 │   ├── mcp/mcp.json            # MCP gateway server configuration
-│   ├── scripts/                # generate-env.sh, validate-setup.sh, verification scripts
-│   ├── hooks/                  # Standalone langfuse hook copy
-│   └── settings-examples/      # Reference settings.json examples
+│   └── scripts/                # MCP verification scripts
 │
 ├── .planning/                  # GSD project planning state
 ├── gitprojects/                # Working directory for repos developed in the sandbox
@@ -108,7 +106,7 @@ secrets.json ← save-secrets ← live container
 | Path | Purpose |
 |------|---------|
 | `/workspace/config.json` | Master settings (firewall, langfuse, vscode, mcp) |
-| `/workspace/secrets.json` | Credentials (Claude auth, Codex auth, API keys) — gitignored |
+| `/workspace/secrets.json` | Credentials (Claude auth, Codex auth, infra secrets) — gitignored |
 | `/workspace/agent-config/` | Version-controlled templates, skills, hooks |
 | `/home/node/.claude/` | Container-local Claude config (generated at build time) |
 | `/home/node/.codex/` | Codex CLI config and credentials |
@@ -118,8 +116,8 @@ secrets.json ← save-secrets ← live container
 | `/home/node/.claude/agents/gsd-*.md` | GSD specialized agents (11 agents) |
 | `/home/node/.claude/hooks/langfuse_hook.py` | Langfuse tracing hook |
 | `/home/node/.claude/settings.local.json` | Generated settings (Langfuse env, hooks) |
-| `/home/node/.claude-api-env` | API key exports (sourced by .bashrc/.zshrc) |
 | `/usr/local/bin/save-secrets` | Credential capture helper |
+| `/usr/local/bin/langfuse-setup` | Langfuse stack setup (generate secrets, start, verify) |
 | `/usr/local/bin/init-firewall.sh` | Firewall script |
 | `/usr/local/bin/mcp-setup` | MCP auto-config script |
 | `/var/run/docker.sock` | Host Docker socket (bind-mounted) |
@@ -157,15 +155,8 @@ secrets.json ← save-secrets ← live container
 |----------|-------|---------|
 | `TRACE_TO_LANGFUSE` | `true` | Master switch for tracing hook |
 | `LANGFUSE_PUBLIC_KEY` | `pk-lf-local-claude-code` | Auto-provisioned project key |
-| `LANGFUSE_SECRET_KEY` | _(from secrets.json)_ | Generated by generate-env.sh |
+| `LANGFUSE_SECRET_KEY` | _(from secrets.json)_ | Generated by langfuse-setup |
 | `LANGFUSE_HOST` | `http://host.docker.internal:3052` | Langfuse API endpoint |
-
-### Set via ~/.claude-api-env (sourced by shell)
-
-| Variable | Source | Purpose |
-|----------|--------|---------|
-| `OPENAI_API_KEY` | `secrets.json → api_keys.openai` | For OpenAI-compatible agents |
-| `GOOGLE_API_KEY` | `secrets.json → api_keys.google` | For Google AI agents |
 
 ## Installed Tools
 
@@ -190,6 +181,7 @@ secrets.json ← save-secrets ← live container
 | `codex` | OpenAI Codex CLI — agentic coding with GPT-5.3-Codex |
 | `codexr` | Alias for `codex --resume` |
 | `save-secrets` | Capture live credentials to secrets.json |
+| `langfuse-setup` | Generate secrets, start Langfuse stack, verify health |
 | `mcp-setup` | Regenerate .mcp.json and health-check MCP gateway |
 
 ## Hooks
@@ -244,7 +236,7 @@ Note: No `~/.claude` bind mount. All Claude config is generated container-locall
 
 ## Rebuild Behavior
 
-Rebuilding the dev container does NOT affect the sidecar stack (Langfuse runs on host Docker engine, data in named volumes). If `secrets.json` contains credentials, they are automatically restored on rebuild by `install-agent-config.sh`. Run `save-secrets` before rebuilding to capture current credentials.
+Rebuilding the dev container does NOT affect the sidecar stack (Langfuse runs on host Docker engine, data in bind mounts under `infra/data/`). If `secrets.json` contains credentials, they are automatically restored on rebuild by `install-agent-config.sh`. Run `save-secrets` before rebuilding to capture current credentials.
 
 ## Docker Run Capabilities
 

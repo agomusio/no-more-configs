@@ -10,8 +10,7 @@ You                         Container
  │                           ├── MCP server config
  ├── secrets.json ─────────► ├── Claude + Codex auth tokens
  │   (credentials)           ├── Git identity
- │                           ├── Langfuse tracing keys
- │                           └── API key exports
+ │                           └── Langfuse infra + tracing keys
  │
  └── Open in Container ────► Done.
 ```
@@ -117,10 +116,11 @@ Everything is driven by two files at the repo root:
   "git": { "name": "Your Name", "email": "you@example.com" },
   "claude": { "credentials": { "...auth tokens..." } },
   "codex": { "auth": { "...oauth tokens..." } },
-  "langfuse": { "public_key": "pk-...", "secret_key": "sk-..." },
-  "api_keys": { "openai": "", "google": "" }
+  "infra": { "postgres_password": "...", "langfuse_project_secret_key": "...", "..." }
 }
 ```
+
+The `infra` section holds all Langfuse stack secrets (database passwords, encryption keys, project keys, admin credentials). Run `langfuse-setup` to generate these automatically.
 
 On container creation, `install-agent-config.sh` reads both files and generates all runtime configuration. On container start, the firewall and MCP servers are initialized from the generated files.
 
@@ -130,7 +130,7 @@ On container creation, `install-agent-config.sh` reads both files and generates 
 authenticate Claude/Codex → set git identity → save-secrets → secrets.json → rebuild → auto-restored
 ```
 
-`save-secrets` captures live Claude credentials, Codex credentials, git identity, Langfuse keys, and API keys back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
+`save-secrets` captures live Claude credentials, Codex credentials, git identity, and infrastructure secrets back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
 
 ### Pre-configured Defaults
 
@@ -184,7 +184,7 @@ The dev container and sidecar services are sibling containers on the same Docker
 
 Default policy is **DROP**. Only whitelisted domains are reachable.
 
-**Always included** (30 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, OpenAI (API + Auth + Platform + ChatGPT), Google AI API, Cloudflare, and more.
+**Always included** (31 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, OpenAI (API + Auth + Platform + ChatGPT), Google AI API, Cloudflare, and more.
 
 **Auto-generated**: Per-publisher VS Code extension CDN domains are derived from `devcontainer.json` so extensions install without firewall errors.
 
@@ -284,8 +284,8 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │
 ├── infra/                      # Langfuse + MCP gateway stack
 │   ├── docker-compose.yml
-│   ├── mcp/mcp.json
-│   └── scripts/
+│   ├── data/                   # Persistent bind mounts (gitignored)
+│   └── mcp/mcp.json
 │
 ├── .planning/                  # GSD project planning state
 ├── gitprojects/                # Your repos go here
@@ -352,7 +352,7 @@ Reopen VS Code and the container.
 
 ### Traces not appearing
 
-1. Check `echo $TRACE_TO_LANGFUSE` (should be `true`)
+1. Inside a Claude session, check `echo $TRACE_TO_LANGFUSE` (should be `true` — this env var is set in Claude's `settings.local.json`, not in the shell)
 2. Check `curl http://host.docker.internal:3052/api/public/health`
 3. Check `tail -20 ~/.claude/state/langfuse_hook.log`
 
