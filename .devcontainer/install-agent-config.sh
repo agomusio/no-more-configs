@@ -490,6 +490,30 @@ if [ "$PLUGIN_ENV" != "{}" ]; then
     fi
 fi
 
+# Plugin installation recap
+if [ "$PLUGIN_INSTALLED" -gt 0 ] || [ "$PLUGIN_SKIPPED" -gt 0 ]; then
+    echo "[install] --- Plugin Recap ---"
+    echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
+
+    # Count total hook registrations
+    TOTAL_HOOK_REGS=0
+    if [ "$PLUGIN_HOOKS" != "{}" ]; then
+        TOTAL_HOOK_REGS=$(echo "$PLUGIN_HOOKS" | jq '[.[] | length] | add // 0' 2>/dev/null || echo "0")
+    fi
+    echo "[install] Hook registrations: $TOTAL_HOOK_REGS"
+
+    # Count total plugin env vars
+    TOTAL_PLUGIN_ENV=0
+    if [ "$PLUGIN_ENV" != "{}" ]; then
+        TOTAL_PLUGIN_ENV=$(echo "$PLUGIN_ENV" | jq 'length' 2>/dev/null || echo "0")
+    fi
+    echo "[install] Plugin env vars: $TOTAL_PLUGIN_ENV"
+
+    if [ "$PLUGIN_WARNINGS" -gt 0 ]; then
+        echo "[install] Warnings: $PLUGIN_WARNINGS"
+    fi
+fi
+
 # Restore Claude credentials (if available)
 if [ -f "$SECRETS_FILE" ]; then
     CLAUDE_CREDS=$(jq -e '.claude.credentials // {}' "$SECRETS_FILE" 2>/dev/null || echo "{}")
@@ -654,8 +678,9 @@ echo "[install] Credentials (Claude): $CREDS_STATUS"
 echo "[install] Credentials (Codex): $CODEX_CREDS_STATUS"
 echo "[install] Git identity: $GIT_IDENTITY_STATUS"
 echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
-echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
+echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
+echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 echo "[install] MCP: $MCP_COUNT server(s)"
 echo "[install] Infra .env: $INFRA_ENV_STATUS"
 echo "[install] GSD: $GSD_COMMANDS commands + $GSD_AGENTS agents"
