@@ -12,10 +12,20 @@ CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-/home/node/.claude}"
 if [ -f "$SECRETS_FILE" ]; then
     SECRETS=$(cat "$SECRETS_FILE")
 else
-    SECRETS='{"claude":{"credentials":{}},"langfuse":{"public_key":"","secret_key":""},"api_keys":{"openai":"","google":""}}'
+    SECRETS='{"git":{"name":"","email":""},"claude":{"credentials":{}},"codex":{"auth":{}},"langfuse":{"public_key":"","secret_key":""},"api_keys":{"openai":"","google":""}}'
 fi
 
 echo "[save-secrets] Capturing live credentials..."
+
+# Capture git identity
+GIT_NAME=$(git config --global user.name 2>/dev/null || echo "")
+GIT_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
+if [ -n "$GIT_NAME" ] || [ -n "$GIT_EMAIL" ]; then
+    SECRETS=$(echo "$SECRETS" | jq --arg name "$GIT_NAME" --arg email "$GIT_EMAIL" '.git.name = $name | .git.email = $email')
+    echo "[save-secrets] Git identity: captured ($GIT_NAME <$GIT_EMAIL>)"
+else
+    echo "[save-secrets] Git identity: not set"
+fi
 
 # Capture Claude credentials
 if [ -f "$CLAUDE_DIR/.credentials.json" ]; then
@@ -24,6 +34,16 @@ if [ -f "$CLAUDE_DIR/.credentials.json" ]; then
     echo "[save-secrets] Claude credentials: captured"
 else
     echo "[save-secrets] Claude credentials: not found (manual login required after rebuild)"
+fi
+
+# Capture Codex CLI credentials
+CODEX_AUTH_FILE="/home/node/.codex/auth.json"
+if [ -f "$CODEX_AUTH_FILE" ]; then
+    CODEX_AUTH=$(cat "$CODEX_AUTH_FILE")
+    SECRETS=$(echo "$SECRETS" | jq --argjson auth "$CODEX_AUTH" '.codex.auth = $auth')
+    echo "[save-secrets] Codex credentials: captured"
+else
+    echo "[save-secrets] Codex credentials: not found (run 'codex' to authenticate)"
 fi
 
 # Capture Langfuse keys from settings

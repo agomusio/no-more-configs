@@ -16,7 +16,7 @@ Complete reference for the development environment Claude Code runs inside. Use 
 ```
 Host (VS Code + Docker Desktop)
  ├── VS Code → Dev Container (Debian/Node 20, user: node)
- │   ├── Claude Code CLI + custom skills + GSD framework
+ │   ├── Claude Code CLI + Codex CLI + custom skills + GSD framework
  │   ├── iptables whitelist firewall
  │   └── /var/run/docker.sock (bind-mounted from host)
  │
@@ -48,6 +48,7 @@ On container creation, `install-agent-config.sh` reads both files and generates:
 - `.vscode/settings.json` (git scan paths from `config.json` + auto-detected repos)
 - `.mcp.json` (MCP client config from enabled templates)
 - `~/.claude/.credentials.json` (restored from `secrets.json`)
+- `~/.codex/auth.json` (restored from `secrets.json`)
 - `~/.claude-api-env` (API key exports sourced by shell)
 
 ### Credential Round-Trip
@@ -58,7 +59,7 @@ secrets.json → install-agent-config.sh → runtime files
 secrets.json ← save-secrets ← live container
 ```
 
-`save-secrets` (installed to PATH) captures live credentials back into `secrets.json` for persistence across rebuilds.
+`save-secrets` (installed to PATH) captures live Claude credentials, Codex credentials, Langfuse keys, and API keys back into `secrets.json` for persistence across rebuilds.
 
 ## Workspace Layout
 
@@ -107,9 +108,12 @@ secrets.json ← save-secrets ← live container
 | Path | Purpose |
 |------|---------|
 | `/workspace/config.json` | Master settings (firewall, langfuse, vscode, mcp) |
-| `/workspace/secrets.json` | Credentials (Claude auth, API keys) — gitignored |
+| `/workspace/secrets.json` | Credentials (Claude auth, Codex auth, API keys) — gitignored |
 | `/workspace/agent-config/` | Version-controlled templates, skills, hooks |
 | `/home/node/.claude/` | Container-local Claude config (generated at build time) |
+| `/home/node/.codex/` | Codex CLI config and credentials |
+| `/home/node/.codex/config.toml` | Codex config (file-based credential store) |
+| `/home/node/.codex/auth.json` | Codex OAuth credentials (restored from secrets.json) |
 | `/home/node/.claude/commands/gsd/` | GSD slash commands (~28 commands) |
 | `/home/node/.claude/agents/gsd-*.md` | GSD specialized agents (11 agents) |
 | `/home/node/.claude/hooks/langfuse_hook.py` | Langfuse tracing hook |
@@ -175,7 +179,7 @@ secrets.json ← save-secrets ← live container
 | **Editors** | nano (default), vim |
 | **Utilities** | jq, fzf, unzip, man-db, procps, less |
 | **Python** | langfuse, openai, opentelemetry-api, httpx |
-| **npm global** | get-shit-done-cc, claude (latest) |
+| **npm global** | get-shit-done-cc, claude (latest), @openai/codex (latest) |
 
 ## Shell Shortcuts
 
@@ -183,6 +187,8 @@ secrets.json ← save-secrets ← live container
 |---------|--------|
 | `claude` | Runs with bypassPermissions by default (set in global settings.json) |
 | `clauder` | Alias for `claude --resume` |
+| `codex` | OpenAI Codex CLI — agentic coding with GPT-5.3-Codex |
+| `codexr` | Alias for `codex --resume` |
 | `save-secrets` | Capture live credentials to secrets.json |
 | `mcp-setup` | Regenerate .mcp.json and health-check MCP gateway |
 
@@ -198,7 +204,7 @@ secrets.json ← save-secrets ← live container
 
 The iptables-based firewall (`init-firewall.sh`) runs on every container start. Default policy is **DROP** — only whitelisted domains are reachable.
 
-Core domains (27, always included): Anthropic, GitHub, npm, PyPI, Debian, VS Code Marketplace, Cloudflare, Google Storage, OpenAI API, Google AI API.
+Core domains (30, always included): Anthropic, GitHub, npm, PyPI, Debian, VS Code Marketplace, Cloudflare, Google Storage, OpenAI (API, Auth, Platform, ChatGPT), Google AI API.
 
 Extra domains from `config.json → firewall.extra_domains` are appended.
 

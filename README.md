@@ -4,11 +4,11 @@ No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding 
 
 ```
 You                         Container
- │                           ├── Claude Code CLI
+ │                           ├── Claude Code CLI + Codex CLI
  ├── config.json ──────────► ├── Firewall domains
  │   (settings)              ├── VS Code settings
  │                           ├── MCP gateway config
- ├── secrets.json ─────────► ├── Claude auth tokens
+ ├── secrets.json ─────────► ├── Claude + Codex auth tokens
  │   (credentials)           ├── Langfuse tracing keys
  │                           └── API key exports
  │
@@ -18,6 +18,7 @@ You                         Container
 ## What You Get
 
 - **Claude Code** (latest) with custom skills and hooks pre-installed
+- **Codex CLI** (latest) — OpenAI's agentic coding CLI (GPT-5.3-Codex)
 - **Langfuse** self-hosted observability — every conversation traced to a local dashboard
 - **MCP gateway** for Model Context Protocol tool access
 - **GSD framework** — 28 slash commands and 11 specialized agents for structured development
@@ -44,21 +45,20 @@ VS Code will detect the devcontainer and prompt to reopen in container. Click **
 
 First build takes a few minutes. Subsequent opens are fast.
 
-### 2. Authenticate Claude
+### 2. Authenticate
 
-Once the container is running:
+Once the container is running, authenticate the CLI agents you want to use:
 
 ```bash
-claude
+claude          # Follow OAuth prompts (Claude Pro/Max subscription)
+codex           # Follow OAuth prompts (ChatGPT Plus/Pro subscription)
 ```
 
-Follow the authentication prompts. After authenticating, run:
+After authenticating, capture your credentials so they survive container rebuilds:
 
 ```bash
 save-secrets
 ```
-
-This captures your credentials into `secrets.json` so they survive container rebuilds.
 
 ### 3. Start the Langfuse Stack (Optional)
 
@@ -77,8 +77,10 @@ Wait 30-60s, then verify at `http://localhost:3052`.
 Start coding:
 
 ```bash
-claude                         # Permissions are bypassed by default in this container
-clauder                        # Resume last session
+claude                         # Claude Code — permissions bypassed by default
+clauder                        # Resume last Claude session
+codex                          # Codex CLI — OpenAI's agentic coding agent
+codexr                         # Resume last Codex session
 ```
 
 Your projects go in `gitprojects/`. Clone repos there and they'll be auto-detected by VS Code's git scanner.
@@ -105,6 +107,7 @@ Everything is driven by two files at the repo root:
 ```json
 {
   "claude": { "credentials": { "...auth tokens..." } },
+  "codex": { "auth": { "...oauth tokens..." } },
   "langfuse": { "public_key": "pk-...", "secret_key": "sk-..." },
   "api_keys": { "openai": "", "google": "" }
 }
@@ -115,10 +118,10 @@ On container creation, `install-agent-config.sh` reads both files and generates 
 ### Credential Persistence
 
 ```
-authenticate Claude → save-secrets → secrets.json → rebuild → auto-restored
+authenticate Claude/Codex → save-secrets → secrets.json → rebuild → auto-restored
 ```
 
-`save-secrets` captures live Claude credentials, Langfuse keys, and API keys back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
+`save-secrets` captures live Claude credentials, Codex credentials, Langfuse keys, and API keys back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
 
 ### Agent Config
 
@@ -138,7 +141,7 @@ Add your own skills by creating a directory under `agent-config/skills/` with a 
 ```
 Host (Docker Desktop)
  ├── VS Code → Dev Container (Debian/Node 20)
- │   ├── Claude Code + skills + GSD framework
+ │   ├── Claude Code + Codex CLI + skills + GSD framework
  │   ├── iptables whitelist firewall
  │   └── /var/run/docker.sock (from host)
  │
@@ -160,7 +163,7 @@ The dev container and sidecar services are sibling containers on the same Docker
 
 Default policy is **DROP**. Only whitelisted domains are reachable.
 
-**Always included** (27 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, OpenAI API, Google AI API, Cloudflare, and more.
+**Always included** (30 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, OpenAI (API + Auth + Platform + ChatGPT), Google AI API, Cloudflare, and more.
 
 **User-configured**: Add domains to `config.json → firewall.extra_domains` — they're appended automatically on rebuild.
 

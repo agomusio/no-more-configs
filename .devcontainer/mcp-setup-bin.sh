@@ -1,24 +1,44 @@
 #!/bin/sh
-# MCP setup script - auto-generates global .mcp.json and checks gateway health
+# MCP setup script - regenerates .mcp.json from templates and checks gateway health
+# Uses the same template system as install-agent-config.sh
 
 gateway_url="${MCP_GATEWAY_URL:-http://host.docker.internal:8811}"
 claude_dir="${HOME}/.claude"
+workspace="${CLAUDE_WORKSPACE:-/workspace}"
+config_file="${workspace}/config.json"
+templates_dir="${workspace}/agent-config/mcp-templates"
 
 mkdir -p "$claude_dir"
 
-# Generate .mcp.json in global Claude config
-cat <<EOF > "${claude_dir}/.mcp.json"
-{
-  "mcpServers": {
-    "mcp-gateway": {
-      "type": "sse",
-      "url": "${gateway_url}/sse"
-    }
-  }
-}
-EOF
+# Generate .mcp.json from enabled MCP templates (same logic as install-agent-config.sh)
+MCP_JSON='{"mcpServers":{}}'
+MCP_COUNT=0
 
-echo "✓ Generated ${claude_dir}/.mcp.json"
+if [ -f "$config_file" ]; then
+    ENABLED_SERVERS=$(jq -r '.mcp_servers | to_entries[] | select(.value.enabled == true) | .key' "$config_file" 2>/dev/null || echo "")
+
+    if [ -n "$ENABLED_SERVERS" ]; then
+        for SERVER in $ENABLED_SERVERS; do
+            TEMPLATE_FILE="${templates_dir}/${SERVER}.json"
+            if [ -f "$TEMPLATE_FILE" ]; then
+                HYDRATED=$(sed "s|{{MCP_GATEWAY_URL}}|$gateway_url|g" "$TEMPLATE_FILE")
+                MCP_JSON=$(echo "$MCP_JSON" | jq --argjson server "{\"$SERVER\": $HYDRATED}" '.mcpServers += $server')
+                MCP_COUNT=$((MCP_COUNT + 1))
+            else
+                echo "⚠ Template not found: $TEMPLATE_FILE"
+            fi
+        done
+    fi
+fi
+
+# Fallback: if no servers were added, include mcp-gateway as default
+if [ "$MCP_COUNT" -eq 0 ]; then
+    MCP_JSON='{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$gateway_url"'/sse"}}}'
+    MCP_COUNT=1
+fi
+
+echo "$MCP_JSON" | jq '.' > "${claude_dir}/.mcp.json"
+echo "✓ Generated ${claude_dir}/.mcp.json with $MCP_COUNT server(s)"
 
 # Poll gateway health endpoint with retry logic
 echo "Checking gateway health at ${gateway_url}/health..."

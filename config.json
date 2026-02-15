@@ -5,6 +5,9 @@
   "langfuse": {
     "host": "http://host.docker.internal:3052"
   },
+  "codex": {
+    "model": "gpt-5.3-codex"
+  },
   "agent": {
     "defaults": {}
   },
@@ -13,6 +16,9 @@
   },
   "mcp_servers": {
     "mcp-gateway": {
+      "enabled": true
+    },
+    "codex": {
       "enabled": true
     }
   }
