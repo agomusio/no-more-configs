@@ -4,26 +4,31 @@
 
 See: .planning/PROJECT.md (updated 2026-02-15)
 
-**Core value:** All container configuration is generated from source files checked into the repo — no host bind mounts, no scattered settings, no manual file placement.
-**Current focus:** v1.2 — Plugins & Proper Skills/Commands
+**Core value:** All container configuration is generated from source files checked into the repo — plugins extend this with self-registering bundles.
+**Current focus:** Phase 4: Core Plugin System
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-15 — Milestone v1.2 started
+Phase: 4 of 7 (Core Plugin System)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-02-15 — Roadmap created for v1.2 milestone
 
-Progress:░░░░░░░░░░ 0%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
-**v1 Velocity:**
+**v1 Velocity (baseline):**
 - Total plans completed: 6
 - Average duration: 3.5 min
 - Total execution time: ~22 min
 
-**By Phase:**
+**v1.2 Velocity:**
+- Total plans completed: 0
+- Average duration: N/A
+- Total execution time: 0.0 hours
+
+**By Phase (v1):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
@@ -31,22 +36,34 @@ Progress:░░░░░░░░░░ 0%
 | 2. Directory Dissolution | 2 | 11 min | 5.5 min |
 | 3. Runtime Generation & Cut-Over | 2 | 8 min | 4 min |
 
+**Recent Trend:**
+- Last 5 plans: None yet for v1.2
+- Trend: N/A
+
+*Updated after each plan completion*
+
 ## Accumulated Context
 
 ### Decisions
 
-See [v1 Roadmap Archive](.planning/milestones/v1-ROADMAP.md) for full decision history.
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- No decisions logged yet for v1.2 milestone
 
 ### Pending Todos
 
-None.
+None yet.
 
 ### Blockers/Concerns
 
-None — v1 milestone complete.
+None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-15 (milestone v1 archived)
-Stopped at: Milestone complete — ready for /gsd:new-milestone
+Last session: 2026-02-15
+Stopped at: Roadmap creation complete for v1.2
 Resume file: None
+
+---
+*State updated: 2026-02-15 for milestone v1.2*

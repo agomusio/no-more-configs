@@ -95,47 +95,47 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLUG-01 | — | Pending |
-| PLUG-02 | — | Pending |
-| PLUG-03 | — | Pending |
-| PLUG-04 | — | Pending |
-| PLUG-05 | — | Pending |
-| PLUG-06 | — | Pending |
-| COPY-01 | — | Pending |
-| COPY-02 | — | Pending |
-| COPY-03 | — | Pending |
-| COPY-04 | — | Pending |
-| COPY-05 | — | Pending |
-| COPY-06 | — | Pending |
-| HOOK-01 | — | Pending |
-| HOOK-02 | — | Pending |
-| HOOK-03 | — | Pending |
-| HOOK-04 | — | Pending |
-| ENV-01 | — | Pending |
-| ENV-02 | — | Pending |
-| ENV-03 | — | Pending |
-| MCP-01 | — | Pending |
-| MCP-02 | — | Pending |
-| MCP-03 | — | Pending |
-| MCP-04 | — | Pending |
-| CMD-01 | — | Pending |
-| CMD-02 | — | Pending |
-| CMD-03 | — | Pending |
-| LANG-01 | — | Pending |
-| LANG-02 | — | Pending |
-| LANG-03 | — | Pending |
-| LANG-04 | — | Pending |
-| LANG-05 | — | Pending |
-| VAL-01 | — | Pending |
-| VAL-02 | — | Pending |
-| VAL-03 | — | Pending |
-| VAL-04 | — | Pending |
+| PLUG-01 | Phase 4 | Pending |
+| PLUG-02 | Phase 4 | Pending |
+| PLUG-03 | Phase 4 | Pending |
+| PLUG-04 | Phase 4 | Pending |
+| PLUG-05 | Phase 4 | Pending |
+| PLUG-06 | Phase 4 | Pending |
+| COPY-01 | Phase 4 | Pending |
+| COPY-02 | Phase 4 | Pending |
+| COPY-03 | Phase 4 | Pending |
+| COPY-04 | Phase 4 | Pending |
+| COPY-05 | Phase 4 | Pending |
+| COPY-06 | Phase 4 | Pending |
+| HOOK-01 | Phase 4 | Pending |
+| HOOK-02 | Phase 4 | Pending |
+| HOOK-03 | Phase 4 | Pending |
+| HOOK-04 | Phase 4 | Pending |
+| ENV-01 | Phase 4 | Pending |
+| ENV-02 | Phase 4 | Pending |
+| ENV-03 | Phase 4 | Pending |
+| CMD-01 | Phase 4 | Pending |
+| CMD-02 | Phase 4 | Pending |
+| CMD-03 | Phase 4 | Pending |
+| MCP-01 | Phase 5 | Pending |
+| MCP-02 | Phase 5 | Pending |
+| MCP-03 | Phase 5 | Pending |
+| MCP-04 | Phase 5 | Pending |
+| LANG-01 | Phase 6 | Pending |
+| LANG-02 | Phase 6 | Pending |
+| LANG-03 | Phase 6 | Pending |
+| LANG-04 | Phase 6 | Pending |
+| LANG-05 | Phase 6 | Pending |
+| VAL-01 | Phase 7 | Pending |
+| VAL-02 | Phase 7 | Pending |
+| VAL-03 | Phase 7 | Pending |
+| VAL-04 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 35 total
-- Mapped to phases: 0
-- Unmapped: 35
+- Mapped to phases: 35
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-15*
-*Last updated: 2026-02-15 after initial definition*
+*Last updated: 2026-02-15 after roadmap creation*
