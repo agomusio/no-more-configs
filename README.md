@@ -102,18 +102,23 @@ Your projects go in `gitprojects/`. Clone repos there and they'll be auto-detect
 Everything is driven by two files at the repo root:
 
 **`config.json`** (committed) — non-secret settings:
+
 ```json
 {
   "firewall": { "extra_domains": ["your-api.example.com"] },
   "codex": { "model": "gpt-5.3-codex" },
   "langfuse": { "host": "http://host.docker.internal:3052" },
   "vscode": { "git_scan_paths": ["gitprojects/my-project"] },
-  "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": false } },
+  "mcp_servers": {
+    "mcp-gateway": { "enabled": true },
+    "codex": { "enabled": false }
+  },
   "plugins": { "langfuse-tracing": { "enabled": true, "env": {} } }
 }
 ```
 
 **`secrets.json`** (gitignored) — credentials and plugin secrets:
+
 ```json
 {
   "git": { "name": "Your Name", "email": "you@example.com" },
@@ -144,9 +149,8 @@ Both CLI agents are pre-configured for container use — no interactive prompts 
 
 | Setting | Claude Code | Codex CLI |
 |---------|-------------|-----------|
-| **Permissions** | `bypassPermissions` (no prompts) | `approval_policy = "never"` |
+| **Permissions** | Bypassed (`bypassPermissions` in settings) | Bypassed (`approval_policy = "never"`) |
 | **Model** | Opus (high effort) | `gpt-5.3-codex` (configurable via `config.json`) |
-| **Sandbox** | N/A (container is the sandbox) | `danger-full-access` |
 | **Credentials** | `~/.claude/.credentials.json` | `~/.codex/auth.json` (file-based, no keyring) |
 | **Onboarding** | Skipped when credentials present | Workspace pre-trusted |
 
@@ -173,13 +177,19 @@ agent-config/plugins/my-plugin/
 ```
 
 Minimal `plugin.json`:
+
 ```json
 {
   "name": "my-plugin",
   "version": "1.0.0",
   "description": "What this plugin does",
   "hooks": {
-    "Stop": [{ "type": "command", "command": "python3 /home/node/.claude/hooks/my_hook.py" }]
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 /home/node/.claude/hooks/my_hook.py"
+      }
+    ]
   },
   "env": {
     "MY_VAR": "value",
@@ -207,6 +217,7 @@ Override env vars via `config.json`:
 ### Validation
 
 The install script validates plugins and provides clear feedback:
+
 - Missing hook scripts → plugin skipped with warning
 - File conflicts between plugins → first-wins with warning
 - Invalid `plugin.json` → friendly error + raw parse details
@@ -215,13 +226,13 @@ The install script validates plugins and provides clear feedback:
 
 ### Included Plugins
 
-| Plugin | Description |
-|--------|-------------|
+| Plugin             | Description                                                         |
+| ------------------ | ------------------------------------------------------------------- |
 | `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars) |
-| `nmc` | NMC system status command (`/nmc`) |
-| `frontend-design` | Frontend design skills and patterns |
-| `plugin-dev` | Plugin development guidance |
-| `ralph-wiggum` | Ralph Wiggum technique for creative problem solving |
+| `nmc`              | NMC system status command (`/nmc`)                                  |
+| `frontend-design`  | Frontend design skills and patterns                                 |
+| `plugin-dev`       | Plugin development guidance                                         |
+| `ralph-wiggum`     | Ralph Wiggum technique for creative problem solving                 |
 
 ---
 
@@ -294,14 +305,20 @@ MCP servers come from two sources:
 1. **Templates** in `agent-config/mcp-templates/`, enabled in `config.json → mcp_servers`
 2. **Plugins** declaring `mcp_servers` in their `plugin.json` manifest
 
-| Server | Source | Description |
-|--------|--------|-------------|
-| `mcp-gateway` | Template | Docker MCP Gateway at `127.0.0.1:8811` |
-| `codex` | Template | Codex CLI as MCP server — gives Claude access to `codex`, `review`, `listSessions` tools |
+| Server        | Source   | Description                                                                              |
+| ------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `mcp-gateway` | Template | Docker MCP Gateway at `127.0.0.1:8811`                                                   |
+| `codex`       | Template | Codex CLI as MCP server — gives Claude access to `codex`, `review`, `listSessions` tools |
 
 Enable a template server:
+
 ```json
-{ "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": true } } }
+{
+  "mcp_servers": {
+    "mcp-gateway": { "enabled": true },
+    "codex": { "enabled": true }
+  }
+}
 ```
 
 Plugin MCP servers are registered automatically and persist across container restarts. The `mcp-setup` command regenerates base template servers on every container start while preserving plugin servers.
@@ -336,17 +353,17 @@ tail -50 ~/.claude/state/langfuse_hook.log
 
 ## Shell Shortcuts
 
-| Command | Action |
-|---------|--------|
-| `claude` | Claude Code — Opus, high effort, permissions bypassed |
-| `clauder` | Alias for `claude --resume` |
-| `codex` | Codex CLI — GPT-5.3-Codex, full-auto, no sandbox |
-| `codexr` | Alias for `codex --resume` |
-| `save-secrets` | Capture live credentials, git identity, and keys to `secrets.json` |
-| `langfuse-setup` | Generate secrets, start Langfuse stack, verify health |
-| `mcp-setup` | Regenerate `.mcp.json` from templates and health-check MCP gateway |
-| `slc` | Show postCreate lifecycle log (`/tmp/devcontainer-logs/postCreate.log`) |
-| `sls` | Show postStart lifecycle log (`/tmp/devcontainer-logs/postStart.log`) |
+| Command          | Action                                                                  |
+| ---------------- | ----------------------------------------------------------------------- |
+| `claude`         | Claude Code — Opus, high effort, permissions bypassed                   |
+| `clauder`        | Alias for `claude --resume`                                             |
+| `codex`          | Codex CLI — GPT-5.3-Codex, full-auto, no sandbox                        |
+| `codexr`         | Alias for `codex --resume`                                              |
+| `save-secrets`   | Capture live credentials, git identity, and keys to `secrets.json`      |
+| `langfuse-setup` | Generate secrets, start Langfuse stack, verify health                   |
+| `mcp-setup`      | Regenerate `.mcp.json` from templates and health-check MCP gateway      |
+| `slc`            | Show postCreate lifecycle log (`/tmp/devcontainer-logs/postCreate.log`) |
+| `sls`            | Show postStart lifecycle log (`/tmp/devcontainer-logs/postStart.log`)   |
 
 ---
 
@@ -402,7 +419,7 @@ Rebuild the container to apply.
 Edit `config.json`:
 
 ```json
-{ "codex": { "model": "o4-mini" } }
+{ "codex": { "model": "o4-mini" } } // example
 ```
 
 Rebuild the container. Default is `gpt-5.3-codex`.
@@ -426,11 +443,13 @@ Add the path to `config.json → vscode.git_scan_paths` for VS Code git integrat
 ### Adding MCP Servers
 
 Via templates:
+
 1. Create a template in `agent-config/mcp-templates/`
 2. Enable it in `config.json → mcp_servers`
 3. Rebuild
 
 Via plugins:
+
 1. Add `mcp_servers` to your plugin's `plugin.json`
 2. Add secrets to `secrets.json` under the plugin name
 3. Rebuild
@@ -460,6 +479,7 @@ Reopen VS Code and the container.
 ### Plugin warnings during install
 
 Check the install output for the `--- Warnings Recap ---` section. Common issues:
+
 - Missing hook script file → plugin skipped (check the file path in your plugin.json)
 - Unresolved `{{TOKEN}}` → add the secret to `secrets.json` under your plugin name
 - File conflict → two plugins provide the same file (first alphabetically wins)
@@ -478,10 +498,10 @@ Handled automatically. If it recurs: `git config --global --add safe.directory '
 
 ## Known Issues
 
-| Issue | Cause | Status |
-|-------|-------|--------|
+| Issue                                                                                | Cause                                                                                                                                            | Status                                                                                                 |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | Claude Code Edit tool throws `ENOENT: no such file or directory` on files that exist | WSL2 bind mount (C:\ → 9P → container) causes stale file metadata; the Edit tool's freshness check sees a mismatched mtime and rejects the write | Intermittent, self-healing (re-read + retry succeeds). Likely resolved in a future Claude Code update. |
-| Lifecycle terminal closes before you can read output | VS Code dismisses the postCreate/postStart terminal on completion | Use `slc` / `sls` aliases to view saved logs from `/tmp/devcontainer-logs/` |
+| Lifecycle terminal closes before you can read output                                 | VS Code dismisses the postCreate/postStart terminal on completion                                                                                | Use `slc` / `sls` aliases to view saved logs from `/tmp/devcontainer-logs/`                            |
 
 ---
 
