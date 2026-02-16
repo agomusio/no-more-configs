@@ -938,6 +938,60 @@ if [ "$PLUGIN_ENV" != "{}" ]; then
     echo "[install] Merged plugin env vars into settings.json"
 fi
 
+# --- Auto-discover project-repo plugins ---
+# Scans /workspace/projects/*/.claude/plugins/*/ for valid plugin manifests
+# and registers them in settings.json's plugins[] array so Claude Code loads them at runtime.
+PROJECT_PLUGINS_COUNT=0
+declare -a PROJECT_PLUGIN_PATHS=()
+
+if [ -d "$WORKSPACE_ROOT/projects" ]; then
+    for project_dir in "$WORKSPACE_ROOT/projects"/*/; do
+        [ -d "$project_dir" ] || continue
+        PLUGINS_DIR="$project_dir.claude/plugins"
+        [ -d "$PLUGINS_DIR" ] || continue
+
+        for plugin_dir in "$PLUGINS_DIR"/*/; do
+            [ -d "$plugin_dir" ] || continue
+            plugin_name=$(basename "$plugin_dir")
+
+            # Accept manifest at .claude-plugin/plugin.json (standard) or plugin.json (legacy)
+            MANIFEST=""
+            if [ -f "$plugin_dir/.claude-plugin/plugin.json" ]; then
+                MANIFEST="$plugin_dir/.claude-plugin/plugin.json"
+            elif [ -f "$plugin_dir/plugin.json" ]; then
+                MANIFEST="$plugin_dir/plugin.json"
+            fi
+
+            if [ -z "$MANIFEST" ]; then
+                echo "[install] Project plugin '$plugin_name' in $(basename "$project_dir"): skipped (no manifest)"
+                continue
+            fi
+
+            if ! jq empty < "$MANIFEST" &>/dev/null; then
+                echo "[install] Project plugin '$plugin_name' in $(basename "$project_dir"): skipped (invalid JSON)"
+                continue
+            fi
+
+            # Normalize path (remove trailing slash)
+            plugin_path="${plugin_dir%/}"
+            PROJECT_PLUGIN_PATHS+=("$plugin_path")
+            PROJECT_PLUGINS_COUNT=$((PROJECT_PLUGINS_COUNT + 1))
+            echo "[install] Project plugin '$plugin_name' in $(basename "$project_dir"): registered"
+        done
+    done
+fi
+
+# Merge discovered project plugins into settings.json plugins[] array
+if [ ${#PROJECT_PLUGIN_PATHS[@]} -gt 0 ]; then
+    # Build JSON array of paths
+    PLUGINS_JSON=$(printf '%s\n' "${PROJECT_PLUGIN_PATHS[@]}" | jq -R . | jq -s .)
+    jq --argjson new_plugins "$PLUGINS_JSON" '
+        .plugins = ((.plugins // []) + $new_plugins | unique)
+    ' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+        && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+    echo "[install] Registered $PROJECT_PLUGINS_COUNT project plugin(s) in settings.json"
+fi
+
 # Print summary
 echo "[install] --- Summary ---"
 echo "[install] Config: $CONFIG_STATUS"
@@ -951,10 +1005,18 @@ echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
 echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
 echo "[install] Upstream plugins: $UPSTREAM_STATUS"
-echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
+echo "[install] Plugins (agent-config): $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 if [ ${#PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
     for detail_line in "${PLUGIN_DETAIL_LINES[@]}"; do
         echo "[install] $detail_line"
+    done
+fi
+echo "[install] Plugins (projects): $PROJECT_PLUGINS_COUNT registered"
+if [ ${#PROJECT_PLUGIN_PATHS[@]} -gt 0 ]; then
+    for pp in "${PROJECT_PLUGIN_PATHS[@]}"; do
+        # Extract project-name/plugin-name from /workspace/projects/project-name/.claude/plugins/plugin-name
+        project_name=$(echo "$pp" | sed 's|.*/projects/\([^/]*\)/.*|\1|')
+        echo "[install]   $project_name/$(basename "$pp")"
     done
 fi
 if [ "$PLUGIN_WARNINGS" -gt 0 ]; then

@@ -8,7 +8,15 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
-## [1.0.2] - 2026-02-16
+## [1.0.3] - 2026-02-16
+
+### Fixed
+
+- Project-repo plugins (`projects/*/.claude/plugins/*/`) not loading — install script now auto-discovers and registers them in `settings.json` `plugins[]` array
+
+---
+
+## [1.0.2] - 2026-02-16 `released`
 
 ### Changed
 
@@ -22,7 +30,7 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
-## [1.0.1] - 2026-02-16
+## [1.0.1] - 2026-02-16 `released`
 
 ### Fixed
 
@@ -50,7 +58,7 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
-## [1.0.0] - 2026-02-16
+## [1.0.0] - 2026-02-16 `released`
 
 First public release. Everything below is what ships out of the box.
 
@@ -94,6 +102,7 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.0.2]: https://github.com/agomusio/no-more-configs/compare/v1.0.1...HEAD
+[1.0.3]: https://github.com/agomusio/no-more-configs/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/agomusio/no-more-configs/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/agomusio/no-more-configs/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/agomusio/no-more-configs/releases/tag/v1.0.0
