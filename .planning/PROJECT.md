@@ -136,4 +136,10 @@ See [v1 Roadmap Archive](.planning/milestones/v1-ROADMAP.md) and [v1 Requirement
 </details>
 
 ---
-*Last updated: 2026-02-16 after v1.2 milestone*
+
+## Changelog
+
+- **2026-02-16** — Codex MCP parity: MCP servers now configured in Codex `config.toml` alongside Claude `.mcp.json`. Added `targets` field for per-agent server filtering. Fixed mcp-gateway template double-nesting bug. Fixed `codexr` alias (`codex resume`). GSD count updated to 30+.
+
+---
+*Last updated: 2026-02-16*
