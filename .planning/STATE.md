@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 6 of 6 (Langfuse Migration & Validation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-16 — Completed 06-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-02-16 — Completed 06-02-PLAN.md
 
-Progress: [█████░░░░░] 50% (Phase 6)
+Progress: [██████████] 100% (Phase 6)
 
 ## Performance Metrics
 
@@ -24,9 +24,9 @@ Progress: [█████░░░░░] 50% (Phase 6)
 - Total execution time: ~22 min
 
 **v1.2 Velocity:**
-- Total plans completed: 5
-- Average duration: 1.9 min
-- Total execution time: 0.16 hours
+- Total plans completed: 6
+- Average duration: 2.0 min
+- Total execution time: 0.20 hours
 
 **By Phase (v1.2):**
 
@@ -34,7 +34,7 @@ Progress: [█████░░░░░] 50% (Phase 6)
 |-------|-------|-------|----------|
 | 4. Core Plugin System | 3 | 4.7 min | 1.6 min |
 | 5. MCP Integration | 1 | 2.5 min | 2.5 min |
-| 6. Langfuse Migration | 1 | 2.4 min | 2.4 min |
+| 6. Langfuse Migration | 2 | 4.9 min | 2.5 min |
 
 ## Accumulated Context
 
@@ -62,6 +62,12 @@ Recent decisions affecting current work:
 - [Phase 06-01]: Minimal plugin manifests - only declare used fields (no empty arrays)
 - [Phase 06-01]: Settings template simplified to permissions-only (all hooks/env via plugins)
 - [Phase 06-01]: Per-plugin env hydration during accumulation (before conflict detection)
+- [Phase 06-02]: Hook script validation skips entire plugin if referenced script file missing
+- [Phase 06-02]: File overwrite detection uses first-wins strategy (consistent with env var conflicts)
+- [Phase 06-02]: JSON parse errors show friendly message first, then raw parse error
+- [Phase 06-02]: Empty env vars after hydration produce warning but don't skip plugin
+- [Phase 06-02]: Warnings recap appears after "Done." with full warning messages
+- [Phase 06-02]: Per-plugin details integrated into main summary (old recap section removed)
 
 ### Pending Todos
 
@@ -74,8 +80,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 06-01-PLAN.md (Langfuse migration to plugin)
-Resume file: .planning/phases/06-langfuse-migration-validation/06-02-PLAN.md
+Stopped at: Completed 06-02-PLAN.md (Plugin validation & install summary)
+Resume file: Phase 6 complete — ready for next milestone
 
 ---
 *State updated: 2026-02-16 for milestone v1.2*
