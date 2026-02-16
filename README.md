@@ -34,8 +34,7 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 </div>
 
 <div align="center">
-
-```
+<pre>
 |   You                         Container                                   |
 |    │                           ├── Claude Code CLI + Codex CLI            |
 |    ├── config.json ──────────► ├── Firewall domains                       |
@@ -47,8 +46,7 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 |    ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP   |
 |    │   (self-registering)                                                 |
 |    └── Open in Container ────► Done.                                      |
-```
-
+</pre>
 </div>
 
 ---
