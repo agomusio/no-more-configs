@@ -2,7 +2,7 @@
   "permissions": {
     "additionalDirectories": [
       "/workspace/",
-      "/workspace/gitprojects/"
+      "/workspace/projects/"
     ],
     "defaultMode": "bypassPermissions"
   }

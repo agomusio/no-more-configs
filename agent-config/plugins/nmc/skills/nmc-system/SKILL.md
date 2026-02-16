@@ -164,7 +164,7 @@ On container creation, the install script:
 │   └── scripts/                # MCP verification scripts
 │
 ├── .planning/                  # GSD project planning state
-├── gitprojects/                # Working directory for repos developed in the sandbox
+├── projects/                # Working directory for repos developed in the sandbox
 └── review/                     # Reviews, specs, external AI output
 ```
 

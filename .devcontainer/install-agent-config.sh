@@ -169,13 +169,13 @@ if [ -f "$CONFIG_FILE" ]; then
         # User specified paths — prepend "." (workspace root) if not present
         GIT_SCAN_PATHS=$(echo "$CONFIGURED_PATHS" | jq '. as $paths | if (. | index(".")) then $paths else ["."] + $paths end')
     else
-        # Auto-detect: find .git directories under gitprojects/
+        # Auto-detect: find .git directories under projects/
         DETECTED='["."]'
-        if [ -d "$WORKSPACE_ROOT/gitprojects" ]; then
-            for git_dir in "$WORKSPACE_ROOT/gitprojects"/*/.git; do
+        if [ -d "$WORKSPACE_ROOT/projects" ]; then
+            for git_dir in "$WORKSPACE_ROOT/projects"/*/.git; do
                 if [ -d "$git_dir" ]; then
                     project_name=$(basename "$(dirname "$git_dir")")
-                    DETECTED=$(echo "$DETECTED" | jq --arg p "gitprojects/$project_name" '. + [$p]')
+                    DETECTED=$(echo "$DETECTED" | jq --arg p "projects/$project_name" '. + [$p]')
                 fi
             done
         fi

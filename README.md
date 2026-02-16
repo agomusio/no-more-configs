@@ -129,7 +129,7 @@ codex                          # Codex CLI (GPT-5.3-Codex, full-auto mode)
 codexr                         # Resume a recent Codex session
 ```
 
-Your projects go in `gitprojects/`. Clone repos there and they'll be auto-detected by VS Code's git scanner.
+Your projects go in `projects/`. Clone repos there and they'll be auto-detected by VS Code's git scanner.
 
 ---
 
@@ -146,7 +146,7 @@ Everything is driven by two files at the repo root:
   "firewall": { "extra_domains": ["your-api.example.com"] },
   "codex": { "model": "gpt-5.3-codex" },
   "langfuse": { "host": "http://host.docker.internal:3052" },
-  "vscode": { "git_scan_paths": ["gitprojects/my-project"] },
+  "vscode": { "git_scan_paths": ["projects/my-project"] },
   "mcp_servers": {
     "mcp-gateway": { "enabled": true },
     "codex": { "enabled": false, "targets": ["claude"] }
@@ -443,7 +443,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │   ├── data/                   # Persistent bind mounts (gitignored)
 │   └── mcp/mcp.json
 │
-└── gitprojects/                # Your repos go here
+└── projects/                # Your repos go here
 ```
 
 ---
@@ -481,7 +481,7 @@ Create `agent-config/plugins/my-plugin/plugin.json` with a manifest declaring ho
 ### Adding Git Repos
 
 ```bash
-cd /workspace/gitprojects && git clone <url>
+cd /workspace/projects && git clone <url>
 ```
 
 Add the path to `config.json → vscode.git_scan_paths` for VS Code git integration.
