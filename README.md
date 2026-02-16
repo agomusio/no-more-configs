@@ -21,11 +21,15 @@ cd no-more-configs && code .</pre>
 
 <br>
 
-_"I spent a week configuring Claude Code in Docker. This would have taken me five minutes."_
+_"I spent weekends configuring Claude, Docker, and everything else — now you don't have to."_
 
 <br>
 
-[What You Get](#what-you-get) · [Quick Start](#quick-start) · [How It Works](#how-it-works) · [Plugin System](#plugin-system) · [Customization](#customization)
+[What You Get](#what-you-get) · [Quick Start](#quick-start) · [How It Works](#how-it-works) · [Plugin System](#plugin-system) · [Agent Config](#agent-config)
+<br>
+[Architecture](#architecture) · [Firewall](#firewall) · [MCP Servers](#mcp-servers) · [GSD Framework](#gsd-framework) · [Langfuse Tracing](#langfuse-tracing)
+<br>
+[Shell Shortcuts](#shell-shortcuts) · [Project Structure](#project-structure) · [Customization](#customization) · [Troubleshooting](#troubleshooting) · [Known Issues](#known-issues)
 
 </div>
 
@@ -47,17 +51,17 @@ _"I spent a week configuring Claude Code in Docker. This would have taken me fiv
 
 ## What You Get
 
-| Feature                    | Description                                                                                      | Status         |
-| -------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| Feature                    | Description                                                                                                                    | Status         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------- |
 | **Claude Code**            | Anthropic's agentic coding CLI — Opus 4.6, high effort, permissions bypassed. **Only requires a Claude Pro/Max subscription.** | Out of the box |
-| **Codex CLI**              | OpenAI's agentic coding CLI — GPT-5.3-Codex, full-auto mode. Optional, requires separate ChatGPT Plus/Pro subscription.       | Out of the box |
-| **Plugin system**          | Drop a directory with a `plugin.json` to register hooks, env vars, commands, agents, MCP servers | Out of the box |
-| **GSD framework**          | 30+ slash commands and 11 specialized agents for structured development                          | Out of the box |
-| **iptables firewall**      | Default-deny network with domain whitelist (31 core domains)                                     | Out of the box |
-| **Oh-My-Zsh**              | Powerlevel10k, fzf, git-delta, GitHub CLI                                                        | Out of the box |
-| **Langfuse observability** | Self-hosted tracing — every conversation traced to a local dashboard                             | Opt-in         |
-| **MCP gateway**            | Model Context Protocol tool access via Docker MCP Gateway                                        | Opt-in         |
-| **Codex MCP server**       | Let Claude delegate to Codex mid-session                                                         | Opt-in         |
+| **Codex CLI**              | OpenAI's agentic coding CLI — GPT-5.3-Codex, full-auto mode. Optional, requires separate ChatGPT Plus/Pro subscription.        | Out of the box |
+| **Plugin system**          | Drop a directory with a `plugin.json` to register hooks, env vars, commands, agents, MCP servers                               | Out of the box |
+| **GSD framework**          | 30+ slash commands and 11 specialized agents for structured development                                                        | Out of the box |
+| **iptables firewall**      | Default-deny network with domain whitelist (31 core domains)                                                                   | Out of the box |
+| **Oh-My-Zsh**              | Powerlevel10k, fzf, git-delta, GitHub CLI                                                                                      | Out of the box |
+| **Langfuse observability** | Self-hosted tracing — every conversation traced to a local dashboard                                                           | Opt-in         |
+| **MCP gateway**            | Model Context Protocol tool access via Docker MCP Gateway                                                                      | Opt-in         |
+| **Codex MCP server**       | Let Claude delegate to Codex mid-session                                                                                       | Opt-in         |
 
 ---
 
