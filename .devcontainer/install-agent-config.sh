@@ -42,6 +42,7 @@ PLUGIN_HOOKS='{}'
 PLUGIN_ENV='{}'
 PLUGIN_MCP='{}'
 PLUGIN_WARNINGS=0
+declare -a PLUGIN_WARNING_MESSAGES=()
 
 # Load config.json (or use defaults)
 if [ -f "$CONFIG_FILE" ]; then
@@ -274,6 +275,7 @@ if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
 fi
 
 # --- Plugin Installation ---
+declare -A PLUGIN_FILE_OWNERS=()
 if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
     for plugin_dir in "$AGENT_CONFIG_DIR/plugins"/*/; do
         # Guard against empty directory
@@ -308,8 +310,14 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
             continue
         fi
 
-        # Validate plugin.json is valid JSON
-        if ! validate_json "$MANIFEST" "plugins/$plugin_name/plugin.json"; then
+        # Validate plugin.json is valid JSON (VAL-04: friendly error + parse details)
+        if ! jq empty < "$MANIFEST" &>/dev/null; then
+            local parse_error
+            parse_error=$(jq empty < "$MANIFEST" 2>&1 || true)
+            echo "[install] ERROR: Plugin '$plugin_name' has invalid plugin.json"
+            echo "[install]   $parse_error"
+            PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+            PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': invalid plugin.json — $parse_error")
             PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
             continue
         fi
@@ -319,11 +327,37 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
         if [ "$manifest_name" != "$plugin_name" ]; then
             echo "[install] WARNING: Plugin '$plugin_name' manifest name '$manifest_name' does not match directory name — skipping"
             PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+            PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': manifest name '$manifest_name' does not match directory name")
             PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
             continue
         fi
 
         # Plugin is valid and enabled — proceed to file copying
+
+        # Validate hook scripts exist in plugin directory (VAL-01)
+        MANIFEST_HOOK_CHECK=$(jq -r '.hooks // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+        if [ "$MANIFEST_HOOK_CHECK" != "{}" ] && [ "$MANIFEST_HOOK_CHECK" != "null" ]; then
+            hook_valid=true
+            hook_commands=$(echo "$MANIFEST_HOOK_CHECK" | jq -r '.[][] | select(.type == "command") | .command' 2>/dev/null || true)
+            for hook_cmd in $hook_commands; do
+                # Extract script path from command (handles: python3 /path/to/script.py)
+                hook_script=$(echo "$hook_cmd" | awk '{for(i=1;i<=NF;i++) if($i ~ /\.py$|\.sh$/) print $i}')
+                if [ -n "$hook_script" ]; then
+                    hook_basename=$(basename "$hook_script")
+                    if [ ! -f "$plugin_dir/hooks/$hook_basename" ]; then
+                        echo "[install] WARNING: Plugin '$plugin_name' hook references non-existent script: $hook_basename"
+                        PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                        PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': hook script missing — $hook_basename")
+                        hook_valid=false
+                    fi
+                fi
+            done
+            if [ "$hook_valid" = false ]; then
+                echo "[install] Plugin '$plugin_name': skipped (missing hook script)"
+                PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
+                continue
+            fi
+        fi
 
         # Copy skills (cross-agent: Claude + Codex)
         if [ -d "$plugin_dir/skills" ]; then
@@ -332,30 +366,47 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
             plugin_skills=$(find "$plugin_dir/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
         fi
 
-        # Copy hooks
+        # Copy hooks (with overwrite detection)
         if [ -d "$plugin_dir/hooks" ]; then
             for hook_file in "$plugin_dir/hooks"/*; do
                 [ -f "$hook_file" ] || continue
-                cp "$hook_file" "$CLAUDE_DIR/hooks/"
+                hook_basename=$(basename "$hook_file")
+                if [ -n "${PLUGIN_FILE_OWNERS[hooks/$hook_basename]+x}" ]; then
+                    echo "[install] WARNING: Plugin '$plugin_name' hook file '$hook_basename' conflicts with plugin '${PLUGIN_FILE_OWNERS[hooks/$hook_basename]}' — skipping file"
+                    PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                    PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': hook file '$hook_basename' conflicts with '${PLUGIN_FILE_OWNERS[hooks/$hook_basename]}'")
+                else
+                    PLUGIN_FILE_OWNERS["hooks/$hook_basename"]="$plugin_name"
+                    cp "$hook_file" "$CLAUDE_DIR/hooks/"
+                fi
             done
             plugin_hooks_count=$(find "$plugin_dir/hooks" -maxdepth 1 -type f 2>/dev/null | wc -l)
         fi
 
-        # Copy commands (with GSD protection)
+        # Copy commands (with GSD protection and overwrite detection)
         if [ -d "$plugin_dir/commands" ]; then
             # Check for GSD directory conflict
             if [ -d "$plugin_dir/commands/gsd" ]; then
                 echo "[install] ERROR: Plugin '$plugin_name' attempted to overwrite GSD-protected directory commands/gsd/ -- skipping"
                 PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': GSD-protected commands/gsd/ directory")
             fi
             for cmd_file in "$plugin_dir/commands"/*.md; do
                 [ -f "$cmd_file" ] || continue
-                cp "$cmd_file" "$CLAUDE_DIR/commands/"
+                cmd_basename=$(basename "$cmd_file")
+                if [ -n "${PLUGIN_FILE_OWNERS[commands/$cmd_basename]+x}" ]; then
+                    echo "[install] WARNING: Plugin '$plugin_name' command '$cmd_basename' conflicts with plugin '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}' — skipping file"
+                    PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                    PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': command '$cmd_basename' conflicts with '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}'")
+                else
+                    PLUGIN_FILE_OWNERS["commands/$cmd_basename"]="$plugin_name"
+                    cp "$cmd_file" "$CLAUDE_DIR/commands/"
+                fi
             done
             plugin_cmds=$(find "$plugin_dir/commands" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
         fi
 
-        # Copy agents (with GSD protection)
+        # Copy agents (with GSD protection and overwrite detection)
         if [ -d "$plugin_dir/agents" ]; then
             for agent_file in "$plugin_dir/agents"/*.md; do
                 [ -f "$agent_file" ] || continue
@@ -363,9 +414,17 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
                 if [[ "$agent_name" =~ ^gsd- ]]; then
                     echo "[install] ERROR: Plugin '$plugin_name' attempted to overwrite GSD-protected file agents/$agent_name -- skipping"
                     PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                    PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': GSD-protected agents/$agent_name")
                     continue
                 fi
-                cp "$agent_file" "$CLAUDE_DIR/agents/"
+                if [ -n "${PLUGIN_FILE_OWNERS[agents/$agent_name]+x}" ]; then
+                    echo "[install] WARNING: Plugin '$plugin_name' agent '$agent_name' conflicts with plugin '${PLUGIN_FILE_OWNERS[agents/$agent_name]}' — skipping file"
+                    PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                    PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': agent '$agent_name' conflicts with '${PLUGIN_FILE_OWNERS[agents/$agent_name]}'")
+                else
+                    PLUGIN_FILE_OWNERS["agents/$agent_name"]="$plugin_name"
+                    cp "$agent_file" "$CLAUDE_DIR/agents/"
+                fi
             done
             plugin_agents=$(find "$plugin_dir/agents" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
         fi
@@ -398,6 +457,16 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
                 done
             fi
 
+            # Check for unresolved {{TOKEN}} patterns in plugin env (empty after hydration)
+            unresolved_env=$(echo "$MANIFEST_ENV" | jq -r 'to_entries[] | select(.value | test("^\\{\\{.*\\}\\}$")) | .key' 2>/dev/null || true)
+            if [ -n "$unresolved_env" ]; then
+                for unresolved_var in $unresolved_env; do
+                    echo "[install] WARNING: Plugin '$plugin_name' env var '$unresolved_var' has unresolved placeholder"
+                    PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                    PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': env var '$unresolved_var' has unresolved {{TOKEN}} placeholder")
+                done
+            fi
+
             # Check for conflicts: any key in MANIFEST_ENV that already exists in PLUGIN_ENV
             CONFLICTS=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson new "$MANIFEST_ENV" '
                 [$new | keys[] | select(. as $k | $existing | has($k))]
@@ -405,6 +474,7 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
             if [ "$CONFLICTS" != "[]" ] && [ -n "$CONFLICTS" ]; then
                 echo "[install] WARNING: Plugin '$plugin_name' env var conflict: $CONFLICTS -- using earlier plugin's values"
                 PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': env var conflict: $CONFLICTS (first plugin wins)")
                 # Only add non-conflicting keys
                 PLUGIN_ENV=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson new "$MANIFEST_ENV" '
                     $existing + ($new | to_entries | map(select(.key as $k | $existing | has($k) | not)) | from_entries)
