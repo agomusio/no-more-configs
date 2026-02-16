@@ -47,15 +47,12 @@ PLUGIN_WARNINGS=0
 if [ -f "$CONFIG_FILE" ]; then
     if validate_json "$CONFIG_FILE" "config.json"; then
         CONFIG_STATUS="loaded"
-        LANGFUSE_HOST=$(jq -r '.langfuse.host // "http://host.docker.internal:3052"' "$CONFIG_FILE")
         EXTRA_DOMAINS=$(jq -r '.firewall.extra_domains // [] | join(" ")' "$CONFIG_FILE")
     else
-        LANGFUSE_HOST="http://host.docker.internal:3052"
         EXTRA_DOMAINS=""
     fi
 else
     echo "[install] config.json not found — using defaults"
-    LANGFUSE_HOST="http://host.docker.internal:3052"
     EXTRA_DOMAINS=""
 fi
 
@@ -63,24 +60,9 @@ fi
 if [ -f "$SECRETS_FILE" ]; then
     if validate_json "$SECRETS_FILE" "secrets.json"; then
         SECRETS_STATUS="loaded"
-        LANGFUSE_PUBLIC_KEY=$(jq -r '.infra.langfuse_project_public_key // ""' "$SECRETS_FILE")
-        LANGFUSE_SECRET_KEY=$(jq -r '.infra.langfuse_project_secret_key // ""' "$SECRETS_FILE")
-
-        # Check for missing individual secrets
-        if [ -z "$LANGFUSE_PUBLIC_KEY" ]; then
-            echo "[install] secrets.json: infra.langfuse_project_public_key missing — tracing will not work"
-        fi
-        if [ -z "$LANGFUSE_SECRET_KEY" ]; then
-            echo "[install] secrets.json: infra.langfuse_project_secret_key missing — tracing will not work"
-        fi
-    else
-        LANGFUSE_PUBLIC_KEY=""
-        LANGFUSE_SECRET_KEY=""
     fi
 else
     echo "[install] secrets.json not found — using empty placeholders"
-    LANGFUSE_PUBLIC_KEY=""
-    LANGFUSE_SECRET_KEY=""
 fi
 
 # Get MCP Gateway URL from environment or default
@@ -277,11 +259,8 @@ fi
 
 # Hydrate settings template (merged into settings.json later, after GSD install)
 if [ -f "$SETTINGS_TEMPLATE" ]; then
-    HYDRATED_SETTINGS=$(sed -e "s|{{LANGFUSE_HOST}}|$LANGFUSE_HOST|g" \
-        -e "s|{{LANGFUSE_PUBLIC_KEY}}|$LANGFUSE_PUBLIC_KEY|g" \
-        -e "s|{{LANGFUSE_SECRET_KEY}}|$LANGFUSE_SECRET_KEY|g" \
-        "$SETTINGS_TEMPLATE")
-    echo "[install] Hydrated settings template (will merge into settings.json)"
+    HYDRATED_SETTINGS=$(cat "$SETTINGS_TEMPLATE")
+    echo "[install] Loaded settings template (will merge into settings.json)"
 else
     HYDRATED_SETTINGS='{}'
     echo "[install] WARNING: settings.json.template not found — skipping settings generation"
@@ -404,6 +383,21 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
         # Accumulate environment variables with conflict detection
         MANIFEST_ENV=$(jq -r '.env // {}' "$MANIFEST" 2>/dev/null)
         if [ "$MANIFEST_ENV" != "{}" ] && [ "$MANIFEST_ENV" != "null" ]; then
+            # Hydrate {{TOKEN}} placeholders in this plugin's env from secrets.json
+            if [ -f "$SECRETS_FILE" ]; then
+                env_tokens=$(echo "$MANIFEST_ENV" | grep -oP '\{\{[A-Z_]+\}\}' | sort -u || true)
+                for token_pattern in $env_tokens; do
+                    token_name=$(echo "$token_pattern" | sed 's/{{//;s/}}//')
+                    # Namespaced lookup: secrets.json[plugin-name][TOKEN]
+                    secret_value=$(jq -r --arg p "$plugin_name" --arg k "$token_name" \
+                        '.[$p][$k] // ""' "$SECRETS_FILE" 2>/dev/null || echo "")
+                    if [ -n "$secret_value" ]; then
+                        MANIFEST_ENV=$(echo "$MANIFEST_ENV" | jq --arg token "$token_pattern" --arg value "$secret_value" \
+                            'to_entries | map(if .value == $token then .value = $value else . end) | from_entries' 2>/dev/null || echo "$MANIFEST_ENV")
+                    fi
+                done
+            fi
+
             # Check for conflicts: any key in MANIFEST_ENV that already exists in PLUGIN_ENV
             CONFLICTS=$(jq -n --argjson existing "$PLUGIN_ENV" --argjson new "$MANIFEST_ENV" '
                 [$new | keys[] | select(. as $k | $existing | has($k))]
