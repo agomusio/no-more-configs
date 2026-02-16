@@ -100,6 +100,28 @@ if [ -f "$INFRA_ENV" ]; then
     fi
 fi
 
+# Populate plugin namespaces for plugin env hydration
+# langfuse-tracing: derive from infra keys + config.json host
+CONFIG_FILE="/workspace/config.json"
+LF_HOST=""
+if [ -f "$CONFIG_FILE" ]; then
+    LF_HOST=$(jq -r '.langfuse.host // ""' "$CONFIG_FILE" 2>/dev/null || echo "")
+fi
+LF_PK=$(echo "$SECRETS" | jq -r '.infra.langfuse_project_public_key // ""')
+LF_SK=$(echo "$SECRETS" | jq -r '.infra.langfuse_project_secret_key // ""')
+if [ -n "$LF_PK" ] || [ -n "$LF_SK" ] || [ -n "$LF_HOST" ]; then
+    SECRETS=$(echo "$SECRETS" | jq \
+        --arg host "$LF_HOST" \
+        --arg pk "$LF_PK" \
+        --arg sk "$LF_SK" \
+        '."langfuse-tracing" = {
+            LANGFUSE_HOST: $host,
+            LANGFUSE_PUBLIC_KEY: $pk,
+            LANGFUSE_SECRET_KEY: $sk
+        }')
+    echo "[save-secrets] Plugin namespace 'langfuse-tracing': populated from infra keys + config"
+fi
+
 # Write back to secrets.json
 echo "$SECRETS" | jq '.' > "$SECRETS_FILE"
 chmod 600 "$SECRETS_FILE"
