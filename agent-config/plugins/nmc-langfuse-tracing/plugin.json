@@ -1,5 +1,5 @@
 {
-  "name": "langfuse-tracing",
+  "name": "nmc-langfuse-tracing",
   "version": "1.0.0",
   "description": "Claude Code conversation tracing to Langfuse",
   "hooks": {

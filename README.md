@@ -113,7 +113,7 @@ Everything is driven by two files at the repo root:
     "mcp-gateway": { "enabled": true },
     "codex": { "enabled": false, "targets": ["claude"] }
   },
-  "plugins": { "langfuse-tracing": { "enabled": true, "env": {} } }
+  "plugins": { "nmc-langfuse-tracing": { "enabled": true, "env": {} } }
 }
 ```
 
@@ -124,7 +124,7 @@ Everything is driven by two files at the repo root:
   "git": { "name": "Your Name", "email": "you@example.com" },
   "claude": { "credentials": { "...auth tokens..." } },
   "codex": { "auth": { "...oauth tokens..." } },
-  "langfuse-tracing": { "LANGFUSE_HOST": "...", "LANGFUSE_PUBLIC_KEY": "...", "LANGFUSE_SECRET_KEY": "..." },
+  "nmc-langfuse-tracing": { "LANGFUSE_HOST": "...", "LANGFUSE_PUBLIC_KEY": "...", "LANGFUSE_SECRET_KEY": "..." },
   "infra": { "postgres_password": "...", "langfuse_project_secret_key": "...", "..." }
 }
 ```
@@ -230,9 +230,9 @@ The install script validates plugins and provides clear feedback:
 | Plugin             | Description                                                                                                                                                      |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `nmc`              | NMC system status command (`/nmc`)                                                                                                                               |
-| `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)                                                                                              |
+| `nmc-langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)                                                                                              |
 | `plugin-dev`       | Plugin development guidance ([source](https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev))                                                   |
-| `ralph-wiggum`     | Ralph Wiggum technique for iterative, self-referential AI development loops ([source](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum)) |
+| `nmc-ralph-loop`   | Ralph Wiggum technique for iterative, self-referential AI development loops (forked from [ralph-wiggum](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum)) |
 | `frontend-design`  | Frontend design skills and patterns ([source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design))                                      |
 
 ---
@@ -348,11 +348,11 @@ Run `/gsd:help` inside a Claude session for the full command list.
 
 ## Langfuse Tracing
 
-Every Claude conversation is automatically traced to your local Langfuse instance via the `langfuse-tracing` plugin. The plugin registers a Stop hook that reads transcript files, groups messages into turns, and sends structured traces with generation and tool spans.
+Every Claude conversation is automatically traced to your local Langfuse instance via the `nmc-langfuse-tracing` plugin. The plugin registers a Stop hook that reads transcript files, groups messages into turns, and sends structured traces with generation and tool spans.
 
 View traces at `http://localhost:3052` after starting the Langfuse stack.
 
-To disable tracing, set `"langfuse-tracing": { "enabled": false }` in `config.json → plugins`.
+To disable tracing, set `"nmc-langfuse-tracing": { "enabled": false }` in `config.json → plugins`.
 
 ### Hook Logs
 
@@ -392,7 +392,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 ├── agent-config/               # Version-controlled agent config source
 │   ├── settings.json.template  # Permissions-only template
 │   ├── plugins/                # Self-registering plugin bundles
-│   │   ├── langfuse-tracing/   #   Langfuse conversation tracing
+│   │   ├── nmc-langfuse-tracing/   #   Langfuse conversation tracing
 │   │   ├── nmc/                #   NMC system status
 │   │   └── .../                #   Your plugins here
 │   ├── mcp-templates/          # MCP server templates (mcp-gateway, codex)

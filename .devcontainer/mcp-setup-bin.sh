@@ -150,8 +150,6 @@ else
 fi
 
 echo ""
-echo "Claude config: ${claude_dir}/.mcp.json"
-echo "Codex config:  ${CODEX_TOML}"
-echo "Gateway:       ${gateway_url}"
-echo "Next: Restart Claude/Codex session to pick up MCP tools"
-echo "To add servers: Edit ${LANGFUSE_STACK_DIR:-/workspace/infra}/mcp/mcp.json, restart gateway, then re-run mcp-setup"
+echo "Claude MCP config: ${claude_dir}/.mcp.json"
+echo "Codex MCP config:  ${CODEX_TOML}"
+echo "Gateway:           ${gateway_url}"

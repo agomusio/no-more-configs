@@ -64,6 +64,15 @@
   "forwardPorts": [3000, 8787],
   "portsAttributes": {
     "3000": { "label": "Dev App", "onAutoForward": "silent" },
-    "8787": { "label": "Dev App 2", "onAutoForward": "silent" }
-  }
+    "8787": { "label": "Dev App 2", "onAutoForward": "silent" },
+    "3052": { "label": "Langfuse", "onAutoForward": "ignore" },
+    "5433": { "label": "Postgres", "onAutoForward": "ignore" },
+    "6379": { "label": "Redis", "onAutoForward": "ignore" },
+    "8124": { "label": "ClickHouse HTTP", "onAutoForward": "ignore" },
+    "8811": { "label": "MCP Gateway", "onAutoForward": "ignore" },
+    "9000": { "label": "ClickHouse Native", "onAutoForward": "ignore" },
+    "9090": { "label": "MinIO API", "onAutoForward": "ignore" },
+    "9091": { "label": "MinIO Console", "onAutoForward": "ignore" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "ignore" }
 }

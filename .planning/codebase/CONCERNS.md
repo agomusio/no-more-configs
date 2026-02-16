@@ -40,7 +40,7 @@
 
 ### 2. Langfuse Hook State File Race Condition
 - **Issue:** Multiple concurrent hooks can write state simultaneously; locking is implemented but may not cover all cases
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (lines 139-156)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (lines 139-156)
 - **Impact:** State file corruption if multiple Claude Code sessions end simultaneously, causing duplicate traces or lost progress
 - **Specific concerns:**
   - Line 146-149: File lock is held only during write; read-modify-write pattern still has window
@@ -54,7 +54,7 @@
 
 ### 3. JSON Parsing Edge Cases in Hook
 - **Issue:** JSONL transcript files are parsed line-by-line with limited error recovery
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (lines 430-443)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (lines 430-443)
 - **Impact:** Malformed transcript lines (not UTF-8, truncated JSON) cause skipped messages; conversation gaps may not be noticed
 - **Specific concerns:**
   - No validation of message structure before processing (assumes required fields present)
@@ -100,7 +100,7 @@
 
 ### 1. Langfuse Hook Full Transcript Scan
 - **Issue:** Hook re-scans all transcript files every execution; no incremental processing optimization
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (lines 246-280)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (lines 246-280)
 - **Impact:** Slow hook execution on systems with many projects/sessions; O(n) scan time grows linearly with transcript count
 - **Specific concerns:**
   - Line 265-268: Reads first line of every transcript to extract session_id (stat + read for each file)
@@ -114,7 +114,7 @@
 
 ### 2. Langfuse Hook Log Rotation
 - **Issue:** Log file rotation (line 54-68) is naively implemented; may block hook on first execution after size exceeded
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (lines 54-69)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (lines 54-69)
 - **Impact:** Hook latency spike (200-500ms) first time log exceeds 10MB; user perceives Claude Code slowdown
 - **Specific concerns:**
   - Line 59-67: Rotates all backups in loop; 4 rotations = 4 rename syscalls
@@ -174,7 +174,7 @@
 
 ### 4. Concurrent Hook Execution
 - **Issue:** If two Claude sessions end simultaneously, both hooks may execute concurrently; file locking may not be sufficient
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (lines 139-156)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (lines 139-156)
 - **Impact:** State file may be overwritten; traces may duplicate or be lost
 - **Specific concerns:**
   - Lock file (`langfuse_state.lock`) held only during write (line 146-149)
@@ -192,7 +192,7 @@
 
 ### 1. Secret Redaction in Langfuse Traces
 - **Issue:** Conservative secret redaction patterns (lines 44-51) may not catch all secret formats
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (lines 44-51, 87-111)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (lines 44-51, 87-111)
 - **Impact:** API keys, tokens, or passwords may leak to Langfuse if they don't match patterns
 - **Specific concerns:**
   - Pattern for `api_key` requires 16+ chars; short keys not caught
@@ -248,7 +248,7 @@
 
 ### 1. Langfuse Hook Memory Usage
 - **Issue:** Hook loads entire transcript file into memory (line 418)
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py` (line 418)
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py` (line 418)
 - **Impact:** Very large transcript files (>100MB) cause OOM or slowdown
 - **Current capacity:** Tested up to ~50MB transcript files; likely fails >200MB
 - **Scaling path:**
@@ -330,7 +330,7 @@
 
 ### 2. Hook State Machine
 - **What's not tested:** Concurrent execution, state file corruption recovery, partial write handling
-- **Files:** `/workspace/agent-config/plugins/langfuse-tracing/hooks/langfuse_hook.py`
+- **Files:** `/workspace/agent-config/plugins/nmc-langfuse-tracing/hooks/langfuse_hook.py`
 - **Risk:** Edge cases cause trace loss or duplication; unnoticed until users complain
 - **Priority:** High — data loss risk
 - **Suggestion:** Integration tests with simulated concurrent executions, corrupted state files

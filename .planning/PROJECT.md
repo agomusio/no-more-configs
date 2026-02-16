@@ -30,7 +30,7 @@ The sandbox is a VS Code devcontainer running on Windows 11 via WSL2/Docker Desk
 
 ### Infrastructure
 
-- **Langfuse** tracing via `plugins/langfuse-tracing/` (Stop hook + env vars hydrated from secrets)
+- **Langfuse** tracing via `plugins/nmc-langfuse-tracing/` (Stop hook + env vars hydrated from secrets)
 - **MCP gateway** for tool access (plugin MCP servers persist across restarts)
 - **Firewall** with domain whitelist (27 core + extras from config.json)
 - **GSD framework** — 30+ commands + 11 agents for structured development workflows
@@ -48,7 +48,7 @@ Plugins are enabled by default. Disable via `config.json`: `"plugins": {"name": 
 
 Validation catches: missing hook scripts (skip plugin), file overwrites (first-wins), invalid JSON (friendly + raw error), unresolved `{{TOKEN}}` placeholders (warning). All warnings recapped after install summary.
 
-**Reference implementation:** `langfuse-tracing` plugin (Stop hook + 4 env vars).
+**Reference implementation:** `nmc-langfuse-tracing` plugin (Stop hook + 4 env vars).
 
 ### Tech Debt
 
@@ -95,7 +95,7 @@ Validation catches: missing hook scripts (skip plugin), file overwrites (first-w
 | Namespaced secrets: secrets.json[plugin-name][TOKEN] | v1.2 | ✓ Good — prevents cross-plugin secret collision |
 | _source tagging for MCP persistence | v1.2 | ✓ Good — enables mcp-setup to preserve plugin servers |
 | Settings template → permissions-only | v1.2 | ✓ Good — plugins are sole extensibility path |
-| Minimal manifests (no empty arrays) | v1.2 | ✓ Good — less noise, langfuse-tracing as reference |
+| Minimal manifests (no empty arrays) | v1.2 | ✓ Good — less noise, nmc-langfuse-tracing as reference |
 
 ## Context
 
@@ -103,7 +103,7 @@ Validation catches: missing hook scripts (skip plugin), file overwrites (first-w
 - GSD (Get Shit Done) workflow framework for structured development
 - All work executed from Windows host side
 - Claude Code plugins (public beta) coexist with standalone .claude/ config
-- 5 plugins active: langfuse-tracing, nmc, frontend-design, plugin-dev, ralph-wiggum
+- 5 plugins active: nmc-langfuse-tracing, nmc, frontend-design, plugin-dev, nmc-ralph-loop
 
 <details>
 <summary>v1.2 Milestone Details</summary>

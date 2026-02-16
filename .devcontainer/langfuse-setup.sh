@@ -273,14 +273,27 @@ full_setup() {
     echo ""
     write_env
 
-    # Step 3: Start the stack
+    # Step 3: Pre-create data directories with correct ownership
+    echo ""
+    echo -e "${BLUE}Preparing data directories...${NC}"
+    mkdir -p "$INFRA_DIR/data/clickhouse/data" \
+             "$INFRA_DIR/data/clickhouse/logs" \
+             "$INFRA_DIR/data/minio" \
+             "$INFRA_DIR/data/postgres"
+    # ClickHouse runs as user 101:101
+    docker run --rm -v "$INFRA_DIR/data/clickhouse:/data" busybox chown -R 101:101 /data
+    # MinIO (chainguard) runs as user 65532
+    docker run --rm -v "$INFRA_DIR/data/minio:/data" busybox chown -R 65532:65532 /data
+    ok "Data directories ready"
+
+    # Step 4: Start the stack
     echo ""
     echo -e "${BLUE}Starting Langfuse stack...${NC}"
     docker compose -f "$COMPOSE_FILE" up -d 2>&1 | while IFS= read -r line; do
         echo "  $line"
     done
 
-    # Step 4: Wait for health
+    # Step 5: Wait for health
     echo ""
     echo -e "${BLUE}Waiting for Langfuse to become healthy...${NC}"
     local attempts=0 max_attempts=30
@@ -302,7 +315,7 @@ full_setup() {
         return
     fi
 
-    # Step 5: Summary
+    # Step 6: Summary
     local user_email user_pass
     user_email=$(secret '.infra.langfuse_user_email')
     user_pass=$(secret '.infra.langfuse_user_password')

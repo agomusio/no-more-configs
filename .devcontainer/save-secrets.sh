@@ -101,7 +101,7 @@ if [ -f "$INFRA_ENV" ]; then
 fi
 
 # Populate plugin namespaces for plugin env hydration
-# langfuse-tracing: derive from infra keys + config.json host
+# nmc-langfuse-tracing: derive from infra keys + config.json host
 CONFIG_FILE="/workspace/config.json"
 LF_HOST=""
 if [ -f "$CONFIG_FILE" ]; then
@@ -114,12 +114,12 @@ if [ -n "$LF_PK" ] || [ -n "$LF_SK" ] || [ -n "$LF_HOST" ]; then
         --arg host "$LF_HOST" \
         --arg pk "$LF_PK" \
         --arg sk "$LF_SK" \
-        '."langfuse-tracing" = {
+        '."nmc-langfuse-tracing" = {
             LANGFUSE_HOST: $host,
             LANGFUSE_PUBLIC_KEY: $pk,
             LANGFUSE_SECRET_KEY: $sk
         }')
-    echo "[save-secrets] Plugin namespace 'langfuse-tracing': populated from infra keys + config"
+    echo "[save-secrets] Plugin namespace 'nmc-langfuse-tracing': populated from infra keys + config"
 fi
 
 # Write back to secrets.json

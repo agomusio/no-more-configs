@@ -148,8 +148,9 @@ On container creation, the install script:
 │   ├── hooks/                  # Standalone hooks (copied to ~/.claude/hooks/)
 │   │   └── langfuse_hook.py    # Langfuse tracing hook
 │   └── plugins/                # NMC plugins
+│       ├── nmc-langfuse-tracing/ # Langfuse conversation tracing
 │       ├── nmc/                # System introspection & diagnostics
-│       ├── ralph-wiggum/       # Self-referential loop technique
+│       ├── nmc-ralph-loop/     # Self-referential loop technique
 │       ├── plugin-dev/         # Plugin development toolkit
 │       └── frontend-design/    # Frontend design skills
 │

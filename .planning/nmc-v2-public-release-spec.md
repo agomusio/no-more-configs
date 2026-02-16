@@ -286,7 +286,7 @@ no-more-configs/
 │   │   └── .gitkeep
 │   └── plugins/
 │       ├── .official/            # Downloaded at build time, gitignored
-│       └── langfuse-tracing/     # Ships with NMC (if migrated to plugin)
+│       └── nmc-langfuse-tracing/  # Ships with NMC
 │           ├── plugin.json
 │           └── hooks/
 │               └── langfuse_hook.py

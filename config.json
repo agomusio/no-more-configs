@@ -33,7 +33,7 @@
     }
   },
   "plugins": {
-    "langfuse-tracing": {
+    "nmc-langfuse-tracing": {
       "enabled": true,
       "env": {}
     }

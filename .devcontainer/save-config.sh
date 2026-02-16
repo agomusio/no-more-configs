@@ -101,3 +101,5 @@ if [ ${#SKIPPED[@]} -gt 0 ]; then
     echo "[save-config] Skipped (at default): ${SKIPPED[*]}"
 fi
 echo "[save-config] Written to $CONFIG_FILE under 'claude_code'"
+echo ""
+echo "[save-config] Tip: also run save-secrets to persist credentials (Claude, Codex, infra keys, etc.)"
