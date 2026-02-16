@@ -985,19 +985,16 @@ if [ -d "$WORKSPACE_ROOT/projects" ]; then
                 pp_skills=$(find "$plugin_dir/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
             fi
 
-            # Copy commands (with conflict detection)
+            # Copy commands into namespaced subdirectory (commands/<plugin-name>/ → /plugin-name:cmd)
             if [ -d "$plugin_dir/commands" ]; then
+                # Use manifest name for namespace (matches how the plugin identifies itself)
+                cmd_namespace=$(jq -r '.name // ""' "$MANIFEST" 2>/dev/null)
+                [ -z "$cmd_namespace" ] && cmd_namespace="$plugin_name"
+                mkdir -p "$CLAUDE_DIR/commands/$cmd_namespace"
                 for cmd_file in "$plugin_dir/commands"/*.md; do
                     [ -f "$cmd_file" ] || continue
                     cmd_basename=$(basename "$cmd_file")
-                    if [ -n "${PLUGIN_FILE_OWNERS[commands/$cmd_basename]+x}" ]; then
-                        echo "[install] WARNING: Project plugin '$plugin_name' command '$cmd_basename' conflicts with '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}' — skipping"
-                        PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
-                        PLUGIN_WARNING_MESSAGES+=("Project plugin '$plugin_name': command '$cmd_basename' conflicts with '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}'")
-                    else
-                        PLUGIN_FILE_OWNERS["commands/$cmd_basename"]="$plugin_name (project: $project_basename)"
-                        cp "$cmd_file" "$CLAUDE_DIR/commands/"
-                    fi
+                    cp "$cmd_file" "$CLAUDE_DIR/commands/$cmd_namespace/"
                 done
                 pp_cmds=$(find "$plugin_dir/commands" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
             fi
