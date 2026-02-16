@@ -1,0 +1,37 @@
+{
+  "firewall": {
+    "extra_domains": [
+      "api.example.com",
+      "your-service.example.com"
+    ]
+  },
+  "codex": {
+    "model": "gpt-5.3-codex"
+  },
+  "claude": {
+    "preferences": {
+      "autoCompact": false,
+      "theme": "dark"
+    }
+  },
+  "langfuse": {
+    "host": "http://host.docker.internal:3052"
+  },
+  "vscode": {
+    "git_scan_paths": [
+      "gitprojects/my-project",
+      "gitprojects/another-project"
+    ]
+  },
+  "mcp_servers": {
+    "mcp-gateway": { "enabled": true },
+    "codex": { "enabled": false }
+  },
+  "plugins": {
+    "example-plugin": { "enabled": false },
+    "another-plugin": {
+      "enabled": true,
+      "env": { "CUSTOM_VAR": "override-value" }
+    }
+  }
+}

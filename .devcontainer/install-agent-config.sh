@@ -160,7 +160,7 @@ VSCODE_DIR="$WORKSPACE_ROOT/.vscode"
 mkdir -p "$VSCODE_DIR"
 
 # Read git scan paths from config.json
-GIT_SCAN_PATHS='[".", "gitprojects/adventure-alerts"]'
+GIT_SCAN_PATHS='["."]'
 if [ -f "$CONFIG_FILE" ]; then
     CONFIGURED_PATHS=$(jq -r '.vscode.git_scan_paths // []' "$CONFIG_FILE" 2>/dev/null || echo "[]")
     # If configured paths is non-empty array, use it; otherwise auto-detect

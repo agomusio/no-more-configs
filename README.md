@@ -39,8 +39,8 @@ You                         Container
 ### 1. Clone and Open
 
 ```bash
-git clone https://github.com/agomusio/claude-code-sandbox.git
-cd claude-code-sandbox
+git clone https://github.com/agomusio/no-more-configs.git
+cd no-more-configs
 code .
 ```
 

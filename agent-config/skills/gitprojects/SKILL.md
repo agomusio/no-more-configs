@@ -15,40 +15,6 @@ All repositories developed inside the sandbox live under `/workspace/gitprojects
 
 | Project Name | Directory | Remote | Status |
 |-------------|-----------|--------|--------|
-| **Adventure Alerts** | `/workspace/gitprojects/adventure-alerts/` | `https://github.com/agomusio/adventure-alerts.git` | Active |
-
-## Name Aliases
-
-When the user says any of these, resolve to the corresponding project:
-
-- "Adventure Alerts", "adventure alerts", "AA", "aa", "the alerts project", "the trip planner" → `/workspace/gitprojects/adventure-alerts/`
-
-## Project Details
-
-### Adventure Alerts
-
-**Path:** `/workspace/gitprojects/adventure-alerts/`
-**Description:** Hybrid Trip-Planning & Booking Intelligence Engine
-
-**Key files to read first:**
-
-- `CLAUDE.md` — AI assistant context and working conventions
-- `DECISIONS.md` — Implementation patterns and code conventions
-- `README.md` — Product vision, setup, roadmap, implementation state
-
-**Monorepo structure:**
-
-```
-adventure-alerts/
-├── apps/
-│   └── dashboard/          # Next.js 16.1 (App Router), Mantine UI, Tailwind CSS
-├── packages/
-│   ├── api/                # Cloudflare Workers + Hono, Durable Objects
-│   ├── db/                 # Drizzle ORM schemas (Cloudflare D1)
-│   └── types/              # Shared TypeScript interfaces, constants
-```
-
-**Tech stack:** Next.js, React, Mantine UI, Tailwind CSS, Cloudflare Workers, Hono, Durable Objects, D1, Drizzle ORM
 
 ## Adding a New Project
 
