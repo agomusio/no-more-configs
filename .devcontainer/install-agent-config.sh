@@ -36,6 +36,7 @@ SECRETS_STATUS="empty placeholders — secrets.json not found"
 CREDS_STATUS="missing — manual login required"
 CODEX_CREDS_STATUS="missing — manual login required"
 GIT_IDENTITY_STATUS="not set"
+CC_PREFS_STATUS="none"
 MCP_COUNT=0
 GSD_COMMANDS=0
 GSD_AGENTS=0
@@ -637,6 +638,20 @@ if [ -f "$SECRETS_FILE" ]; then
                 "$CLAUDE_JSON" > "$CLAUDE_JSON.tmp" \
                 && mv "$CLAUDE_JSON.tmp" "$CLAUDE_JSON"
         fi
+
+        # Restore Claude Code user preferences from config.json (saved by save-config.sh)
+        CC_PREFS='{}'
+        if [ -f "$CONFIG_FILE" ]; then
+            CC_PREFS=$(jq -r '.claude_code // {}' "$CONFIG_FILE" 2>/dev/null || echo "{}")
+        fi
+        if [ "$CC_PREFS" != "{}" ] && [ "$CC_PREFS" != "null" ]; then
+            jq --argjson prefs "$CC_PREFS" '. + $prefs' \
+                "$CLAUDE_JSON" > "$CLAUDE_JSON.tmp" \
+                && mv "$CLAUDE_JSON.tmp" "$CLAUDE_JSON"
+            CC_PREF_KEYS=$(echo "$CC_PREFS" | jq -r 'keys | join(", ")' 2>/dev/null || echo "")
+            CC_PREFS_STATUS="restored ($CC_PREF_KEYS)"
+            echo "[install] Claude Code preferences restored: $CC_PREF_KEYS"
+        fi
     else
         echo "[install] Claude credentials not found — manual login required after first start"
     fi
@@ -874,6 +889,7 @@ echo "[install] Settings: generated"
 echo "[install] Credentials (Claude): $CREDS_STATUS"
 echo "[install] Credentials (Codex): $CODEX_CREDS_STATUS"
 echo "[install] Git identity: $GIT_IDENTITY_STATUS"
+echo "[install] Preferences: $CC_PREFS_STATUS"
 echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
 echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"

@@ -126,3 +126,5 @@ fi
 echo "$SECRETS" | jq '.' > "$SECRETS_FILE"
 chmod 600 "$SECRETS_FILE"
 echo "[save-secrets] Saved to $SECRETS_FILE"
+echo ""
+echo "[save-secrets] Tip: also run save-config to persist Claude Code preferences (auto-compact, editor mode, etc.)"

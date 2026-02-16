@@ -152,6 +152,12 @@ RUN sudo cp /tmp/save-secrets.sh /usr/local/bin/save-secrets && \
     sudo chmod +x /usr/local/bin/save-secrets && \
     rm /tmp/save-secrets.sh
 
+# Install save-config helper
+COPY --chown=node:node save-config.sh /tmp/save-config.sh
+RUN sudo cp /tmp/save-config.sh /usr/local/bin/save-config && \
+    sudo chmod +x /usr/local/bin/save-config && \
+    rm /tmp/save-config.sh
+
 # Install langfuse-setup helper
 COPY --chown=node:node langfuse-setup.sh /tmp/langfuse-setup.sh
 RUN sudo cp /tmp/langfuse-setup.sh /usr/local/bin/langfuse-setup && \

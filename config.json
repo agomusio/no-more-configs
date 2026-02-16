@@ -1,6 +1,8 @@
 {
   "firewall": {
-    "extra_domains": ["adventure-alerts-api.sam-ed4.workers.dev"]
+    "extra_domains": [
+      "adventure-alerts-api.sam-ed4.workers.dev"
+    ]
   },
   "langfuse": {
     "host": "http://host.docker.internal:3052"
@@ -15,7 +17,9 @@
     "defaults": {}
   },
   "vscode": {
-    "git_scan_paths": ["gitprojects/adventure-alerts"]
+    "git_scan_paths": [
+      "gitprojects/adventure-alerts"
+    ]
   },
   "mcp_servers": {
     "mcp-gateway": {
@@ -23,7 +27,9 @@
     },
     "codex": {
       "enabled": true,
-      "targets": ["claude"]
+      "targets": [
+        "claude"
+      ]
     }
   },
   "plugins": {
@@ -31,5 +37,9 @@
       "enabled": true,
       "env": {}
     }
+  },
+  "claude_code": {
+    "autoInstallIdeExtension": false,
+    "autoCompactEnabled": false
   }
 }
