@@ -938,17 +938,20 @@ if [ "$PLUGIN_ENV" != "{}" ]; then
     echo "[install] Merged plugin env vars into settings.json"
 fi
 
-# --- Auto-discover project-repo plugins ---
+# --- Auto-discover and install project-repo plugins ---
 # Scans /workspace/projects/*/.claude/plugins/*/ for valid plugin manifests
-# and registers them in settings.json's plugins[] array so Claude Code loads them at runtime.
+# and copies their components to runtime locations (same as agent-config plugins).
+# The plugins[] array alone doesn't work from /workspace/ — Claude Code only
+# auto-discovers plugin components when cwd matches the project root.
 PROJECT_PLUGINS_COUNT=0
-declare -a PROJECT_PLUGIN_PATHS=()
+declare -a PROJECT_PLUGIN_DETAIL_LINES=()
 
 if [ -d "$WORKSPACE_ROOT/projects" ]; then
     for project_dir in "$WORKSPACE_ROOT/projects"/*/; do
         [ -d "$project_dir" ] || continue
         PLUGINS_DIR="$project_dir.claude/plugins"
         [ -d "$PLUGINS_DIR" ] || continue
+        project_basename=$(basename "$project_dir")
 
         for plugin_dir in "$PLUGINS_DIR"/*/; do
             [ -d "$plugin_dir" ] || continue
@@ -963,33 +966,125 @@ if [ -d "$WORKSPACE_ROOT/projects" ]; then
             fi
 
             if [ -z "$MANIFEST" ]; then
-                echo "[install] Project plugin '$plugin_name' in $(basename "$project_dir"): skipped (no manifest)"
+                echo "[install] Project plugin '$plugin_name' in $project_basename: skipped (no manifest)"
                 continue
             fi
 
             if ! jq empty < "$MANIFEST" &>/dev/null; then
-                echo "[install] Project plugin '$plugin_name' in $(basename "$project_dir"): skipped (invalid JSON)"
+                echo "[install] Project plugin '$plugin_name' in $project_basename: skipped (invalid JSON)"
                 continue
             fi
 
-            # Normalize path (remove trailing slash)
-            plugin_path="${plugin_dir%/}"
-            PROJECT_PLUGIN_PATHS+=("$plugin_path")
+            # Reset per-plugin counters
+            pp_skills=0; pp_cmds=0; pp_agents=0; pp_hooks=0
+
+            # Copy skills (cross-agent: Claude + Codex)
+            if [ -d "$plugin_dir/skills" ]; then
+                cp -r "$plugin_dir/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
+                cp -r "$plugin_dir/skills/"* /home/node/.codex/skills/ 2>/dev/null || true
+                pp_skills=$(find "$plugin_dir/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
+            fi
+
+            # Copy commands (with conflict detection)
+            if [ -d "$plugin_dir/commands" ]; then
+                for cmd_file in "$plugin_dir/commands"/*.md; do
+                    [ -f "$cmd_file" ] || continue
+                    cmd_basename=$(basename "$cmd_file")
+                    if [ -n "${PLUGIN_FILE_OWNERS[commands/$cmd_basename]+x}" ]; then
+                        echo "[install] WARNING: Project plugin '$plugin_name' command '$cmd_basename' conflicts with '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}' — skipping"
+                        PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                        PLUGIN_WARNING_MESSAGES+=("Project plugin '$plugin_name': command '$cmd_basename' conflicts with '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}'")
+                    else
+                        PLUGIN_FILE_OWNERS["commands/$cmd_basename"]="$plugin_name (project: $project_basename)"
+                        cp "$cmd_file" "$CLAUDE_DIR/commands/"
+                    fi
+                done
+                pp_cmds=$(find "$plugin_dir/commands" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+            fi
+
+            # Copy agents (with conflict detection)
+            if [ -d "$plugin_dir/agents" ]; then
+                for agent_file in "$plugin_dir/agents"/*.md; do
+                    [ -f "$agent_file" ] || continue
+                    agent_basename=$(basename "$agent_file")
+                    if [[ "$agent_basename" =~ ^gsd- ]]; then
+                        echo "[install] WARNING: Project plugin '$plugin_name' GSD-protected agents/$agent_basename — skipping"
+                        continue
+                    fi
+                    if [ -n "${PLUGIN_FILE_OWNERS[agents/$agent_basename]+x}" ]; then
+                        echo "[install] WARNING: Project plugin '$plugin_name' agent '$agent_basename' conflicts with '${PLUGIN_FILE_OWNERS[agents/$agent_basename]}' — skipping"
+                        PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
+                        PLUGIN_WARNING_MESSAGES+=("Project plugin '$plugin_name': agent '$agent_basename' conflicts with '${PLUGIN_FILE_OWNERS[agents/$agent_basename]}'")
+                    else
+                        PLUGIN_FILE_OWNERS["agents/$agent_basename"]="$plugin_name (project: $project_basename)"
+                        cp "$agent_file" "$CLAUDE_DIR/agents/"
+                    fi
+                done
+                pp_agents=$(find "$plugin_dir/agents" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+            fi
+
+            # Merge hooks from hooks/hooks.json into settings.json
+            if [ -f "$plugin_dir/hooks/hooks.json" ]; then
+                HOOKS_JSON=$(cat "$plugin_dir/hooks/hooks.json")
+                if jq empty <<< "$HOOKS_JSON" &>/dev/null; then
+                    PLUGIN_HOOKS=$(jq -n --argjson acc "$PLUGIN_HOOKS" --argjson new "$HOOKS_JSON" '
+                        $new | to_entries | reduce .[] as $entry ($acc;
+                            .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
+                        )
+                    ' 2>/dev/null || echo "$PLUGIN_HOOKS")
+                    pp_hooks=$(jq 'to_entries | map(.value | length) | add // 0' <<< "$HOOKS_JSON")
+                fi
+            fi
+
+            # Copy standalone hook scripts
+            if [ -d "$plugin_dir/hooks" ]; then
+                for hook_file in "$plugin_dir/hooks"/*; do
+                    [ -f "$hook_file" ] || continue
+                    hook_basename=$(basename "$hook_file")
+                    # Skip hooks.json — already processed above
+                    [ "$hook_basename" = "hooks.json" ] && continue
+                    if [ -n "${PLUGIN_FILE_OWNERS[hooks/$hook_basename]+x}" ]; then
+                        echo "[install] WARNING: Project plugin '$plugin_name' hook '$hook_basename' conflicts with '${PLUGIN_FILE_OWNERS[hooks/$hook_basename]}' — skipping"
+                    else
+                        PLUGIN_FILE_OWNERS["hooks/$hook_basename"]="$plugin_name (project: $project_basename)"
+                        cp "$hook_file" "$CLAUDE_DIR/hooks/"
+                    fi
+                done
+            fi
+
+            # Build detail line
+            detail_parts=()
+            [ "$pp_skills" -gt 0 ] && detail_parts+=("${pp_skills} skill(s)")
+            [ "$pp_cmds" -gt 0 ] && detail_parts+=("${pp_cmds} command(s)")
+            [ "$pp_agents" -gt 0 ] && detail_parts+=("${pp_agents} agent(s)")
+            [ "$pp_hooks" -gt 0 ] && detail_parts+=("${pp_hooks} hook(s)")
+            detail_str=$(IFS=", "; echo "${detail_parts[*]}")
+
+            if [ -n "$detail_str" ]; then
+                echo "[install] Project plugin '$plugin_name' in $project_basename: installed ($detail_str)"
+                PROJECT_PLUGIN_DETAIL_LINES+=("  $project_basename/$plugin_name: $detail_str")
+            else
+                echo "[install] Project plugin '$plugin_name' in $project_basename: installed (manifest only)"
+                PROJECT_PLUGIN_DETAIL_LINES+=("  $project_basename/$plugin_name: manifest only")
+            fi
             PROJECT_PLUGINS_COUNT=$((PROJECT_PLUGINS_COUNT + 1))
-            echo "[install] Project plugin '$plugin_name' in $(basename "$project_dir"): registered"
         done
     done
 fi
 
-# Merge discovered project plugins into settings.json plugins[] array
-if [ ${#PROJECT_PLUGIN_PATHS[@]} -gt 0 ]; then
-    # Build JSON array of paths
-    PLUGINS_JSON=$(printf '%s\n' "${PROJECT_PLUGIN_PATHS[@]}" | jq -R . | jq -s .)
-    jq --argjson new_plugins "$PLUGINS_JSON" '
-        .plugins = ((.plugins // []) + $new_plugins | unique)
+# Re-merge plugin hooks into settings.json (project plugins may have added new hooks)
+if [ "$PROJECT_PLUGINS_COUNT" -gt 0 ] && [ "$PLUGIN_HOOKS" != "{}" ]; then
+    # Rebuild hooks from scratch: start with template hooks, then overlay all accumulated plugin hooks
+    jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
+        reduce ($plugin_hooks | to_entries[]) as $entry (.;
+            .hooks[$entry.key] = (
+                [.hooks[$entry.key] // [] | .[] | select(has("hooks") | not)] +
+                [{"hooks": $entry.value}]
+            )
+        )
     ' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
         && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
-    echo "[install] Registered $PROJECT_PLUGINS_COUNT project plugin(s) in settings.json"
+    echo "[install] Re-merged hooks (including project plugins) into settings.json"
 fi
 
 # Print summary
@@ -1011,12 +1106,10 @@ if [ ${#PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
         echo "[install] $detail_line"
     done
 fi
-echo "[install] Plugins (projects): $PROJECT_PLUGINS_COUNT registered"
-if [ ${#PROJECT_PLUGIN_PATHS[@]} -gt 0 ]; then
-    for pp in "${PROJECT_PLUGIN_PATHS[@]}"; do
-        # Extract project-name/plugin-name from /workspace/projects/project-name/.claude/plugins/plugin-name
-        project_name=$(echo "$pp" | sed 's|.*/projects/\([^/]*\)/.*|\1|')
-        echo "[install]   $project_name/$(basename "$pp")"
+echo "[install] Plugins (projects): $PROJECT_PLUGINS_COUNT installed"
+if [ ${#PROJECT_PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
+    for detail_line in "${PROJECT_PLUGIN_DETAIL_LINES[@]}"; do
+        echo "[install] $detail_line"
     done
 fi
 if [ "$PLUGIN_WARNINGS" -gt 0 ]; then
