@@ -274,14 +274,15 @@ if [ -d "$AGENT_CONFIG_DIR/commands" ]; then
     fi
 fi
 
-# Generate settings.local.json from template
+# Hydrate settings template (merged into settings.json later, after GSD install)
 if [ -f "$SETTINGS_TEMPLATE" ]; then
-    sed -e "s|{{LANGFUSE_HOST}}|$LANGFUSE_HOST|g" \
+    HYDRATED_SETTINGS=$(sed -e "s|{{LANGFUSE_HOST}}|$LANGFUSE_HOST|g" \
         -e "s|{{LANGFUSE_PUBLIC_KEY}}|$LANGFUSE_PUBLIC_KEY|g" \
         -e "s|{{LANGFUSE_SECRET_KEY}}|$LANGFUSE_SECRET_KEY|g" \
-        "$SETTINGS_TEMPLATE" > "$CLAUDE_DIR/settings.local.json"
-    echo "[install] Generated settings.local.json"
+        "$SETTINGS_TEMPLATE")
+    echo "[install] Hydrated settings template (will merge into settings.json)"
 else
+    HYDRATED_SETTINGS='{}'
     echo "[install] WARNING: settings.json.template not found — skipping settings generation"
 fi
 
@@ -455,40 +456,7 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
     echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 fi
 
-# --- Merge Plugin Registrations ---
-
-# Merge plugin hooks into settings.local.json
-if [ "$PLUGIN_HOOKS" != "{}" ]; then
-    SETTINGS_FILE="$CLAUDE_DIR/settings.local.json"
-    if [ -f "$SETTINGS_FILE" ]; then
-        # Merge plugin hooks with existing template hooks
-        # Uses array concatenation (+) to ACCUMULATE hooks, not overwrite
-        # Template hooks (e.g., langfuse Stop hook) are preserved
-        # Plugin hooks are wrapped in {hooks: [...]} objects and appended to each event array
-        jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
-            # For each event in plugin_hooks, append new hook entries to existing array
-            reduce ($plugin_hooks | to_entries[]) as $entry (.;
-                .hooks[$entry.key] = ((.hooks[$entry.key] // []) + [{"hooks": $entry.value}])
-            )
-        ' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
-            && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
-        echo "[install] Merged plugin hooks into settings.local.json"
-    fi
-fi
-
-# Merge plugin env vars into settings.local.json
-if [ "$PLUGIN_ENV" != "{}" ]; then
-    SETTINGS_FILE="$CLAUDE_DIR/settings.local.json"
-    if [ -f "$SETTINGS_FILE" ]; then
-        # Plugin env vars are added to the .env section
-        # Existing template env vars are preserved (plugin env uses + which adds new keys)
-        # config.json overrides were already applied during accumulation (Plan 02)
-        jq --argjson plugin_env "$PLUGIN_ENV" '.env += $plugin_env' \
-            "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" \
-            && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
-        echo "[install] Merged plugin env vars into settings.local.json"
-    fi
-fi
+# --- Plugin registrations are merged into settings.json after GSD install ---
 
 # Plugin installation recap
 if [ "$PLUGIN_INSTALLED" -gt 0 ] || [ "$PLUGIN_SKIPPED" -gt 0 ]; then
@@ -628,7 +596,7 @@ fi
 
 # Detect unresolved {{PLACEHOLDER}} tokens in generated files (GEN-06)
 UNRESOLVED=""
-for generated_file in "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/.mcp.json"; do
+for generated_file in "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/.mcp.json"; do
     if [ -f "$generated_file" ]; then
         tokens=$(grep -oP '\{\{[A-Z_]+\}\}' "$generated_file" 2>/dev/null || true)
         if [ -n "$tokens" ]; then
@@ -663,11 +631,53 @@ else
 fi
 
 # Enforce required settings.json values AFTER GSD (which modifies the file).
-# This is the last write to settings.json — bypassPermissions, model, effort, skip prompt.
 jq '.permissions.defaultMode = "bypassPermissions" | .effortLevel = "high" | .model = "opus" | .skipDangerousModePermissionPrompt = true' \
     "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
     && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
 echo "[install] Enforced settings.json (bypassPermissions, opus, effortLevel: high)"
+
+# --- Merge template + plugin hooks/env into settings.json ---
+# Done AFTER GSD install + enforcement so nothing overwrites these values.
+# Claude Code only reads hooks and env from settings.json (not settings.local.json).
+
+# Merge hydrated template (hooks, env, additionalDirectories) into settings.json
+if [ "$HYDRATED_SETTINGS" != "{}" ]; then
+    jq --argjson tmpl "$HYDRATED_SETTINGS" '
+        # Merge hooks: append template hook arrays to existing arrays per event
+        .hooks = ((.hooks // {}) as $existing |
+            ($tmpl.hooks // {}) | to_entries | reduce .[] as $entry ($existing;
+                .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
+            )
+        ) |
+        # Merge env vars (template values, may be overridden by plugins below)
+        .env = ((.env // {}) + ($tmpl.env // {})) |
+        # Merge additionalDirectories
+        .permissions.additionalDirectories = (
+            ((.permissions.additionalDirectories // []) + ($tmpl.permissions.additionalDirectories // [])) | unique
+        )
+    ' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+        && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+    echo "[install] Merged template hooks + env into settings.json"
+fi
+
+# Merge plugin hooks into settings.json
+if [ "$PLUGIN_HOOKS" != "{}" ]; then
+    jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
+        reduce ($plugin_hooks | to_entries[]) as $entry (.;
+            .hooks[$entry.key] = ((.hooks[$entry.key] // []) + [{"hooks": $entry.value}])
+        )
+    ' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+        && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+    echo "[install] Merged plugin hooks into settings.json"
+fi
+
+# Merge plugin env vars into settings.json
+if [ "$PLUGIN_ENV" != "{}" ]; then
+    jq --argjson plugin_env "$PLUGIN_ENV" '.env = ((.env // {}) + $plugin_env)' \
+        "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+        && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+    echo "[install] Merged plugin env vars into settings.json"
+fi
 
 # Print summary
 echo "[install] --- Summary ---"

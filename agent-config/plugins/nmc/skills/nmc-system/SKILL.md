@@ -45,7 +45,7 @@ All container configuration is driven by two files at the repo root:
 | `secrets.json` | No (gitignored) | Credentials: Claude/Codex auth, git identity, infra secrets |
 
 On container creation, `install-agent-config.sh` reads both files and generates:
-- `~/.claude/settings.local.json` (hydrated from `agent-config/settings.json.template`)
+- `~/.claude/settings.json` (hooks, env vars, permissions — merged from `agent-config/settings.json.template` + plugins + GSD)
 - `~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/commands/`, `~/.claude/agents/` (copied from `agent-config/` + plugins)
 - `.devcontainer/firewall-domains.conf` (core domains + `config.json` extras)
 - `.vscode/settings.json` (git scan paths from `config.json` + auto-detected repos)
@@ -53,6 +53,8 @@ On container creation, `install-agent-config.sh` reads both files and generates:
 - `~/.claude/.credentials.json` (restored from `secrets.json`)
 - `~/.codex/auth.json` (restored from `secrets.json`)
 - `infra/.env` (generated from `secrets.json` infra section via `langfuse-setup --generate-env`)
+
+> **Never use `settings.local.json` for hooks, env vars, or other functional settings.** Claude Code does not execute hooks defined in `settings.local.json`. All hooks, environment variables, and permissions must be in `settings.json`. The `settings.local.json` file is only for per-machine overrides that should not be committed (e.g., project-level `.claude/settings.local.json` for repo-specific allow rules). The install script merges everything into `settings.json`.
 
 ### Credential Round-Trip
 
@@ -101,8 +103,9 @@ On container creation, the install script:
 3. Validates `plugin.json` exists and name matches directory
 4. Copies skills → `~/.claude/skills/`, commands → `~/.claude/commands/`, agents → `~/.claude/agents/`, hooks → `~/.claude/hooks/`
 5. Accumulates hook registrations and env vars from all plugins
-6. Merges hooks into `~/.claude/settings.local.json` `.hooks` (appended, not overwritten)
-7. Merges env vars into `~/.claude/settings.local.json` `.env`
+6. After GSD install + enforcement, merges template hooks + env into `~/.claude/settings.json`
+7. Merges plugin hooks into `~/.claude/settings.json` `.hooks` (appended, not overwritten)
+8. Merges plugin env vars into `~/.claude/settings.json` `.env`
 
 ### Plugin Control via config.json
 
@@ -177,7 +180,7 @@ On container creation, the install script:
 | `/home/node/.claude/commands/gsd/` | GSD slash commands (~28 commands) |
 | `/home/node/.claude/agents/gsd-*.md` | GSD specialized agents (11 agents) |
 | `/home/node/.claude/hooks/langfuse_hook.py` | Langfuse tracing hook |
-| `/home/node/.claude/settings.local.json` | Generated settings (hooks, env vars) |
+| `/home/node/.claude/settings.json` | Claude Code settings (hooks, env vars, permissions, model) |
 | `/home/node/.claude/.mcp.json` | MCP server configuration |
 | `/usr/local/bin/save-secrets` | Credential capture helper |
 | `/usr/local/bin/langfuse-setup` | Langfuse stack setup (generate secrets, start, verify) |
@@ -212,7 +215,7 @@ On container creation, the install script:
 | `LANGFUSE_HOST` | `http://host.docker.internal:3052` | Langfuse endpoint |
 | `MCP_GATEWAY_URL` | `http://host.docker.internal:8811` | MCP gateway endpoint |
 
-### Set in ~/.claude/settings.local.json (env)
+### Set in ~/.claude/settings.json (env)
 
 | Variable | Value | Purpose |
 |----------|-------|---------|

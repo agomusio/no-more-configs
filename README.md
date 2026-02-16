@@ -124,6 +124,8 @@ The `infra` section holds all Langfuse stack secrets (database passwords, encryp
 
 On container creation, `install-agent-config.sh` reads both files and generates all runtime configuration. On container start, the firewall and MCP servers are initialized from the generated files.
 
+> **Important:** All hooks, env vars, and functional settings must be in `settings.json`. Never use `settings.local.json` for hooks or env vars — Claude Code does not execute hooks defined there. The install script merges everything (template + plugins + GSD) into `~/.claude/settings.json`.
+
 ### Credential Persistence
 
 ```
@@ -352,7 +354,7 @@ Reopen VS Code and the container.
 
 ### Traces not appearing
 
-1. Inside a Claude session, check `echo $TRACE_TO_LANGFUSE` (should be `true` — this env var is set in Claude's `settings.local.json`, not in the shell)
+1. Inside a Claude session, check `echo $TRACE_TO_LANGFUSE` (should be `true` — this env var is set in Claude's `settings.json`, not in the shell)
 2. Check `curl http://host.docker.internal:3052/api/public/health`
 3. Check `tail -20 ~/.claude/state/langfuse_hook.log`
 
