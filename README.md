@@ -1,32 +1,67 @@
-# No More Configs v1.0.0
+<div align="center">
 
-No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models. Langfuse observability, MCP gateway, plugin system, GSD workflow framework, iptables firewall — all configured from two files at the repo root. No host dependencies, no scattered config, no yak shaving.
+# NO MORE CONFIGS
+
+**A clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models.**
+
+**Two files. One container. Zero yak shaving.**
+
+[![GitHub stars](https://img.shields.io/github/stars/agomusio/no-more-configs?style=for-the-badge&logo=github&color=181717)](https://github.com/agomusio/no-more-configs)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=for-the-badge)](https://github.com/agomusio/no-more-configs/releases/tag/v1.0.0)
+
+<br>
+
+```bash
+git clone https://github.com/agomusio/no-more-configs.git
+cd no-more-configs && code .
+```
+
+**Works on Windows (WSL2), macOS, and Linux.**
+
+<br>
 
 ```
 You                         Container
- │                           ├── Claude Code CLI + Codex CLI
- ├── config.json ──────────► ├── Firewall domains
- │   (settings)              ├── VS Code settings
- │                           ├── MCP server config
- ├── secrets.json ─────────► ├── Claude + Codex auth tokens
- │   (credentials)           ├── Git identity
- │                           ├── Plugin env vars (hydrated)
- ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP
- │   (self-registering)
- └── Open in Container ────► Done.
+ |                           |-- Claude Code CLI + Codex CLI
+ |-- config.json ----------> |-- Firewall domains
+ |   (settings)              |-- VS Code settings
+ |                           |-- MCP server config
+ |-- secrets.json ----------> |-- Claude + Codex auth tokens
+ |   (credentials)           |-- Git identity
+ |                           |-- Plugin env vars (hydrated)
+ |-- agent-config/plugins/ -> \-- Hooks, commands, agents, skills, MCP
+ |   (self-registering)
+ \-- Open in Container -----> Done.
 ```
+
+<br>
+
+*"I spent a week configuring Claude Code in Docker. This would have taken me five minutes."*
+
+<br>
+
+[What You Get](#what-you-get) · [Quick Start](#quick-start) · [How It Works](#how-it-works) · [Plugin System](#plugin-system) · [Customization](#customization)
+
+</div>
+
+---
 
 ## What You Get
 
-- **Claude Code** (latest) — Anthropic's agentic coding CLI, pre-configured with bypass permissions, Opus 4.6, high effort
-- **Codex CLI** (latest) — OpenAI's agentic coding CLI (GPT-5.3-Codex), pre-configured with full-auto mode
-- **Plugin system** — drop a directory in `agent-config/plugins/` with a `plugin.json` manifest to register hooks, env vars, commands, agents, and MCP servers
-- **Langfuse** self-hosted observability — every conversation traced to a local dashboard (runs as a plugin, optional)
-- **MCP gateway** for Model Context Protocol tool access
-- **Codex MCP server** — lets Claude delegate to Codex mid-session (optional, enable in config.json)
-- **GSD framework** — 30+ slash commands and 11 specialized agents for structured development
-- **iptables firewall** — default-deny network with domain whitelist
-- **Oh-My-Zsh** with Powerlevel10k, fzf, git-delta, GitHub CLI
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Claude Code** | Anthropic's agentic coding CLI — Opus 4.6, high effort, permissions bypassed | Out of the box |
+| **Codex CLI** | OpenAI's agentic coding CLI — GPT-5.3-Codex, full-auto mode | Out of the box |
+| **Plugin system** | Drop a directory with a `plugin.json` to register hooks, env vars, commands, agents, MCP servers | Out of the box |
+| **GSD framework** | 30+ slash commands and 11 specialized agents for structured development | Out of the box |
+| **iptables firewall** | Default-deny network with domain whitelist (31 core domains) | Out of the box |
+| **Oh-My-Zsh** | Powerlevel10k, fzf, git-delta, GitHub CLI | Out of the box |
+| **Langfuse observability** | Self-hosted tracing — every conversation traced to a local dashboard | Opt-in |
+| **MCP gateway** | Model Context Protocol tool access via Docker MCP Gateway | Opt-in |
+| **Codex MCP server** | Let Claude delegate to Codex mid-session | Opt-in |
+
+---
 
 ## Quick Start
 
@@ -101,7 +136,7 @@ Your projects go in `gitprojects/`. Clone repos there and they'll be auto-detect
 
 Everything is driven by two files at the repo root:
 
-**`config.json`** (committed) — non-secret settings:
+**`config.json`** — non-secret settings (created by `save-config`, see `config.example.json`):
 
 ```json
 {
@@ -399,14 +434,14 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │   ├── skills/                 # Standalone skills (Claude + Codex)
 │   └── commands/               # Standalone slash commands
 │
-├── config.json                 # Settings (committed)
+├── config.example.json         # Annotated config reference
+├── secrets.example.json        # Secret schema reference
 │
 ├── infra/                      # Langfuse + MCP gateway stack
 │   ├── docker-compose.yml
 │   ├── data/                   # Persistent bind mounts (gitignored)
 │   └── mcp/mcp.json
 │
-├── .planning/                  # GSD project planning state
 ├── gitprojects/                # Your repos go here
 └── review/                     # Reviews and specs
 ```
@@ -430,7 +465,7 @@ Rebuild the container to apply.
 Edit `config.json`:
 
 ```json
-{ "codex": { "model": "o4-mini" } } // example
+{ "codex": { "model": "o4-mini" } }
 ```
 
 Rebuild the container. Default is `gpt-5.3-codex`.
@@ -471,7 +506,7 @@ Via plugins:
 
 ### Langfuse unreachable / port 3052 blocked
 
-WSL2's networking can enter a broken state. Fix:
+WSL2's networking can enter a broken state (Windows only). Fix:
 
 ```powershell
 # PowerShell as Administrator
@@ -516,9 +551,16 @@ Handled automatically. If it recurs: `git config --global --add safe.directory '
 
 ---
 
+<div align="center">
+
 ## Acknowledgments
 
-- **Dev Container** — Modified from the official [Claude Code Dev Container](https://github.com/anthropics/claude-code) reference configuration.
-- **Langfuse Stack** — Built from Doneyli de Jesus's [claude-code-langfuse-template](https://github.com/doneyli/claude-code-langfuse-template), as described in [I Built My Own Observability for Claude Code](https://doneyli.substack.com/p/i-built-my-own-observability-for).
-- **GSD Framework** — [Get Shit Done](https://github.com/glittercowboy/get-shit-done) by glittercowboy.
-- **Codex MCP Server** — [codex-mcp-server](https://github.com/tuannvm/codex-mcp-server) by tuannvm.
+Built on the shoulders of:
+
+**[Claude Code Dev Container](https://github.com/anthropics/claude-code)** · **[claude-code-langfuse-template](https://github.com/doneyli/claude-code-langfuse-template)** · **[Get Shit Done](https://github.com/glittercowboy/get-shit-done)** · **[codex-mcp-server](https://github.com/tuannvm/codex-mcp-server)**
+
+<br>
+
+MIT License · Copyright (c) 2025 agomusio
+
+</div>
