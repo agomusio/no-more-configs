@@ -243,7 +243,7 @@ Add your own skills by creating a directory under `agent-config/skills/` with a 
 
 ```
 Host (Docker Desktop)
- ├── VS Code → Dev Container (Debian/Node 20)
+ ├── VS Code → Dev Container (Debian 12 Bookworm / Node 20)
  │   ├── Claude Code + Codex CLI + plugins + GSD framework
  │   ├── iptables whitelist firewall
  │   └── /var/run/docker.sock (from host)
