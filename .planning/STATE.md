@@ -65,8 +65,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-mcp-integration/05-CONTEXT.md
+Stopped at: Phase 5 planned (1 plan, 1 wave, verified)
+Resume file: .planning/phases/05-mcp-integration/05-01-PLAN.md
 
 ---
 *State updated: 2026-02-15 for milestone v1.2*
