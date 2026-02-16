@@ -1,6 +1,6 @@
 # No More Configs
 
-No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models. Langfuse observability, MCP gateway, GSD workflow framework, iptables firewall — all configured from two files at the repo root. No host dependencies, no scattered config, no yak shaving.
+No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models. Langfuse observability, MCP gateway, plugin system, GSD workflow framework, iptables firewall — all configured from two files at the repo root. No host dependencies, no scattered config, no yak shaving.
 
 ```
 You                         Container
@@ -10,8 +10,9 @@ You                         Container
  │                           ├── MCP server config
  ├── secrets.json ─────────► ├── Claude + Codex auth tokens
  │   (credentials)           ├── Git identity
- │                           └── Langfuse infra + tracing keys
- │
+ │                           ├── Plugin env vars (hydrated)
+ ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP
+ │   (self-registering)
  └── Open in Container ────► Done.
 ```
 
@@ -19,7 +20,8 @@ You                         Container
 
 - **Claude Code** (latest) — Anthropic's agentic coding CLI, pre-configured with bypass permissions, Opus model, high effort
 - **Codex CLI** (latest) — OpenAI's agentic coding CLI (GPT-5.3-Codex), pre-configured with full-auto mode
-- **Langfuse** self-hosted observability — every conversation traced to a local dashboard (optional)
+- **Plugin system** — drop a directory in `agent-config/plugins/` with a `plugin.json` manifest to register hooks, env vars, commands, agents, and MCP servers
+- **Langfuse** self-hosted observability — every conversation traced to a local dashboard (runs as a plugin, optional)
 - **MCP gateway** for Model Context Protocol tool access
 - **Codex MCP server** — lets Claude delegate to Codex mid-session (optional, enable in config.json)
 - **GSD framework** — 28 slash commands and 11 specialized agents for structured development
@@ -106,23 +108,25 @@ Everything is driven by two files at the repo root:
   "codex": { "model": "gpt-5.3-codex" },
   "langfuse": { "host": "http://host.docker.internal:3052" },
   "vscode": { "git_scan_paths": ["gitprojects/my-project"] },
-  "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": false } }
+  "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": false } },
+  "plugins": { "langfuse-tracing": { "enabled": true, "env": {} } }
 }
 ```
 
-**`secrets.json`** (gitignored) — credentials:
+**`secrets.json`** (gitignored) — credentials and plugin secrets:
 ```json
 {
   "git": { "name": "Your Name", "email": "you@example.com" },
   "claude": { "credentials": { "...auth tokens..." } },
   "codex": { "auth": { "...oauth tokens..." } },
+  "langfuse-tracing": { "LANGFUSE_HOST": "...", "LANGFUSE_PUBLIC_KEY": "...", "LANGFUSE_SECRET_KEY": "..." },
   "infra": { "postgres_password": "...", "langfuse_project_secret_key": "...", "..." }
 }
 ```
 
-The `infra` section holds all Langfuse stack secrets (database passwords, encryption keys, project keys, admin credentials). Run `langfuse-setup` to generate these automatically.
+Plugin secrets use namespaced keys (`secrets.json["plugin-name"]["TOKEN"]`). The `infra` section holds Langfuse stack infrastructure secrets. Run `langfuse-setup` to generate these automatically — `save-secrets` derives the plugin namespace from the infra keys.
 
-On container creation, `install-agent-config.sh` reads both files and generates all runtime configuration. On container start, the firewall and MCP servers are initialized from the generated files.
+On container creation, `install-agent-config.sh` reads both files, discovers plugins, hydrates `{{TOKEN}}` placeholders, and generates all runtime configuration. On container start, the firewall and MCP servers are initialized from the generated files.
 
 > **Important:** All hooks, env vars, and functional settings must be in `settings.json`. Never use `settings.local.json` for hooks or env vars — Claude Code does not execute hooks defined there. The install script merges everything (template + plugins + GSD) into `~/.claude/settings.json`.
 
@@ -132,7 +136,7 @@ On container creation, `install-agent-config.sh` reads both files and generates 
 authenticate Claude/Codex → set git identity → save-secrets → secrets.json → rebuild → auto-restored
 ```
 
-`save-secrets` captures live Claude credentials, Codex credentials, git identity, and infrastructure secrets back into `secrets.json`. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
+`save-secrets` captures live Claude credentials, Codex credentials, git identity, infrastructure secrets, and derives plugin secret namespaces. The install script restores them on the next rebuild. Delete `secrets.json` to start fresh.
 
 ### Pre-configured Defaults
 
@@ -146,16 +150,92 @@ Both CLI agents are pre-configured for container use — no interactive prompts 
 | **Credentials** | `~/.claude/.credentials.json` | `~/.codex/auth.json` (file-based, no keyring) |
 | **Onboarding** | Skipped when credentials present | Workspace pre-trusted |
 
-### Agent Config
+---
+
+## Plugin System
+
+Plugins are self-registering bundles discovered from `agent-config/plugins/*/plugin.json`. Each manifest can declare:
+
+- **hooks** — registered in settings.json (multiple plugins accumulate on same events)
+- **env** — injected with `{{TOKEN}}` placeholder hydration from `secrets.json[plugin-name][TOKEN]`
+- **mcp_servers** — merged into `.mcp.json` with `_source` tagging for persistence
+- **files** — skills, hooks, commands, agents copied to `~/.claude/`
+
+### Creating a Plugin
+
+```
+agent-config/plugins/my-plugin/
+├── plugin.json           # Manifest (required)
+├── hooks/                # Hook scripts
+├── commands/             # Slash commands (*.md)
+├── agents/               # Agent definitions (*.md)
+└── skills/               # Skills directories
+```
+
+Minimal `plugin.json`:
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "description": "What this plugin does",
+  "hooks": {
+    "Stop": [{ "type": "command", "command": "python3 /home/node/.claude/hooks/my_hook.py" }]
+  },
+  "env": {
+    "MY_VAR": "value",
+    "MY_SECRET": "{{MY_SECRET}}"
+  }
+}
+```
+
+Only declare fields you use — no empty arrays needed.
+
+### Plugin Control
+
+Plugins are enabled by default. Disable via `config.json`:
+
+```json
+{ "plugins": { "my-plugin": { "enabled": false } } }
+```
+
+Override env vars via `config.json`:
+
+```json
+{ "plugins": { "my-plugin": { "env": { "MY_VAR": "override-value" } } } }
+```
+
+### Validation
+
+The install script validates plugins and provides clear feedback:
+- Missing hook scripts → plugin skipped with warning
+- File conflicts between plugins → first-wins with warning
+- Invalid `plugin.json` → friendly error + raw parse details
+- Unresolved `{{TOKEN}}` placeholders → warning (non-fatal)
+- All warnings recapped after install summary
+
+### Included Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars) |
+| `nmc` | NMC system status command (`/nmc`) |
+| `frontend-design` | Frontend design skills and patterns |
+| `plugin-dev` | Plugin development guidance |
+| `ralph-wiggum` | Ralph Wiggum technique for creative problem solving |
+
+---
+
+## Agent Config
 
 The `agent-config/` directory is the version-controlled source of truth:
 
-- **`settings.json.template`** — Claude Code settings with `{{PLACEHOLDER}}` tokens hydrated from config/secrets
-- **`skills/`** — Custom skills copied to `~/.claude/skills/`
-- **`hooks/`** — Hooks copied to `~/.claude/hooks/`
+- **`settings.json.template`** — Permissions-only template (hooks and env come from plugins)
+- **`plugins/`** — Self-registering plugin bundles with `plugin.json` manifests
+- **`skills/`** — Standalone skills copied to `~/.claude/skills/` and `~/.codex/skills/`
+- **`commands/`** — Standalone slash commands copied to `~/.claude/commands/`
 - **`mcp-templates/`** — MCP server templates (mcp-gateway, codex) with placeholder hydration
 
-Add your own skills by creating a directory under `agent-config/skills/` with a `SKILL.md` file. They'll be installed automatically on rebuild.
+Add your own skills by creating a directory under `agent-config/skills/` with a `SKILL.md` file. They'll be installed to both Claude and Codex automatically on rebuild.
 
 ---
 
@@ -164,7 +244,7 @@ Add your own skills by creating a directory under `agent-config/skills/` with a 
 ```
 Host (Docker Desktop)
  ├── VS Code → Dev Container (Debian/Node 20)
- │   ├── Claude Code + Codex CLI + skills + GSD framework
+ │   ├── Claude Code + Codex CLI + plugins + GSD framework
  │   ├── iptables whitelist firewall
  │   └── /var/run/docker.sock (from host)
  │
@@ -209,21 +289,22 @@ sudo /usr/local/bin/refresh-firewall-dns.sh
 
 ## MCP Servers
 
-MCP servers are managed through templates in `agent-config/mcp-templates/` and enabled in `config.json → mcp_servers`.
+MCP servers come from two sources:
 
-| Server | Template | Description |
-|--------|----------|-------------|
-| `mcp-gateway` | `mcp-gateway.json` | Docker MCP Gateway at `127.0.0.1:8811` |
-| `codex` | `codex.json` | Codex CLI as MCP server — gives Claude access to `codex`, `review`, `listSessions` tools |
+1. **Templates** in `agent-config/mcp-templates/`, enabled in `config.json → mcp_servers`
+2. **Plugins** declaring `mcp_servers` in their `plugin.json` manifest
 
-Enable a server:
+| Server | Source | Description |
+|--------|--------|-------------|
+| `mcp-gateway` | Template | Docker MCP Gateway at `127.0.0.1:8811` |
+| `codex` | Template | Codex CLI as MCP server — gives Claude access to `codex`, `review`, `listSessions` tools |
+
+Enable a template server:
 ```json
 { "mcp_servers": { "mcp-gateway": { "enabled": true }, "codex": { "enabled": true } } }
 ```
 
-The `mcp-setup` command regenerates `~/.claude/.mcp.json` from enabled templates on every container start.
-
-To add a custom MCP server, create a template in `agent-config/mcp-templates/` and enable it in `config.json`.
+Plugin MCP servers are registered automatically and persist across container restarts. The `mcp-setup` command regenerates base template servers on every container start while preserving plugin servers.
 
 ---
 
@@ -239,9 +320,11 @@ Run `/gsd:help` inside a Claude session for the full command list.
 
 ## Langfuse Tracing
 
-Every Claude conversation is automatically traced to your local Langfuse instance via a Stop hook (`langfuse_hook.py`). The hook reads transcript files, groups messages into turns, and sends structured traces with generation and tool spans.
+Every Claude conversation is automatically traced to your local Langfuse instance via the `langfuse-tracing` plugin. The plugin registers a Stop hook that reads transcript files, groups messages into turns, and sends structured traces with generation and tool spans.
 
 View traces at `http://localhost:3052` after starting the Langfuse stack.
+
+To disable tracing, set `"langfuse-tracing": { "enabled": false }` in `config.json → plugins`.
 
 ### Hook Logs
 
@@ -272,15 +355,19 @@ tail -50 ~/.claude/state/langfuse_hook.log
 ├── .devcontainer/              # Container definition and lifecycle scripts
 │   ├── Dockerfile
 │   ├── devcontainer.json
-│   ├── install-agent-config.sh # Master config generator
+│   ├── install-agent-config.sh # Master config generator (plugins, hooks, env, MCP)
 │   ├── init-firewall.sh
 │   └── ...
 │
 ├── agent-config/               # Version-controlled agent config source
-│   ├── settings.json.template  # Settings with {{PLACEHOLDER}} tokens
+│   ├── settings.json.template  # Permissions-only template
+│   ├── plugins/                # Self-registering plugin bundles
+│   │   ├── langfuse-tracing/   #   Langfuse conversation tracing
+│   │   ├── nmc/                #   NMC system status
+│   │   └── .../                #   Your plugins here
 │   ├── mcp-templates/          # MCP server templates (mcp-gateway, codex)
-│   ├── skills/                 # Custom skills
-│   └── hooks/                  # Custom hooks
+│   ├── skills/                 # Standalone skills (Claude + Codex)
+│   └── commands/               # Standalone slash commands
 │
 ├── config.json                 # Settings (committed)
 │
@@ -320,7 +407,11 @@ Rebuild the container. Default is `gpt-5.3-codex`.
 
 ### Adding Skills
 
-Create `agent-config/skills/my-skill/SKILL.md` with a YAML front matter block and skill content. It'll be copied to `~/.claude/skills/` on rebuild.
+Create `agent-config/skills/my-skill/SKILL.md` with a YAML front matter block and skill content. It'll be copied to both `~/.claude/skills/` and `~/.codex/skills/` on rebuild.
+
+### Adding Plugins
+
+Create `agent-config/plugins/my-plugin/plugin.json` with a manifest declaring hooks, env vars, commands, agents, or MCP servers. See the [Plugin System](#plugin-system) section for details.
 
 ### Adding Git Repos
 
@@ -332,8 +423,14 @@ Add the path to `config.json → vscode.git_scan_paths` for VS Code git integrat
 
 ### Adding MCP Servers
 
+Via templates:
 1. Create a template in `agent-config/mcp-templates/`
 2. Enable it in `config.json → mcp_servers`
+3. Rebuild
+
+Via plugins:
+1. Add `mcp_servers` to your plugin's `plugin.json`
+2. Add secrets to `secrets.json` under the plugin name
 3. Rebuild
 
 ---
@@ -357,6 +454,13 @@ Reopen VS Code and the container.
 1. Inside a Claude session, check `echo $TRACE_TO_LANGFUSE` (should be `true` — this env var is set in Claude's `settings.json`, not in the shell)
 2. Check `curl http://host.docker.internal:3052/api/public/health`
 3. Check `tail -20 ~/.claude/state/langfuse_hook.log`
+
+### Plugin warnings during install
+
+Check the install output for the `--- Warnings Recap ---` section. Common issues:
+- Missing hook script file → plugin skipped (check the file path in your plugin.json)
+- Unresolved `{{TOKEN}}` → add the secret to `secrets.json` under your plugin name
+- File conflict → two plugins provide the same file (first alphabetically wins)
 
 ### Docker socket permission denied
 

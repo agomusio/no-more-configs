@@ -158,11 +158,15 @@ RUN sudo cp /tmp/langfuse-setup.sh /usr/local/bin/langfuse-setup && \
     sudo chmod +x /usr/local/bin/langfuse-setup && \
     rm /tmp/langfuse-setup.sh
 
-# Add clauder and codexr aliases (resume) to both shell configs
+# Shell aliases
 RUN echo "alias clauder='claude --resume'" >> /home/node/.bashrc && \
     echo "alias clauder='claude --resume'" >> /home/node/.zshrc && \
     echo "alias codexr='codex --resume'" >> /home/node/.bashrc && \
-    echo "alias codexr='codex --resume'" >> /home/node/.zshrc
+    echo "alias codexr='codex --resume'" >> /home/node/.zshrc && \
+    echo "alias slc='cat /tmp/devcontainer-logs/postCreate.log'" >> /home/node/.bashrc && \
+    echo "alias slc='cat /tmp/devcontainer-logs/postCreate.log'" >> /home/node/.zshrc && \
+    echo "alias sls='cat /tmp/devcontainer-logs/postStart.log'" >> /home/node/.bashrc && \
+    echo "alias sls='cat /tmp/devcontainer-logs/postStart.log'" >> /home/node/.zshrc
 
 # Copy frequently changed infrastructure scripts later for better layer caching
 COPY --chown=node:node init-firewall.sh /tmp/init-firewall.sh

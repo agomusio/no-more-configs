@@ -59,8 +59,8 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && git config --global --add safe.directory /workspace && git config --global --add safe.directory '*' && git config --global core.autocrlf input && bash .devcontainer/setup-network-checks.sh && bash .devcontainer/init-gsd.sh && mcp-setup",
-  "postCreateCommand": "bash .devcontainer/setup-container.sh && bash .devcontainer/install-agent-config.sh",
+  "postStartCommand": "bash .devcontainer/lifecycle-wrapper.sh postStart 'sudo /usr/local/bin/init-firewall.sh && git config --global --add safe.directory /workspace && git config --global --add safe.directory \"*\" && git config --global core.autocrlf input && bash .devcontainer/setup-network-checks.sh && bash .devcontainer/init-gsd.sh && mcp-setup'",
+  "postCreateCommand": "bash .devcontainer/lifecycle-wrapper.sh postCreate 'bash .devcontainer/setup-container.sh && bash .devcontainer/install-agent-config.sh'",
   "waitFor": "postStartCommand",
   "forwardPorts": [3000, 8787],
   "portsAttributes": {
