@@ -899,6 +899,10 @@ echo "[install] Enforced settings.json (bypassPermissions, opus, effortLevel: hi
 # Done AFTER GSD install + enforcement so nothing overwrites these values.
 # Claude Code only reads hooks and env from settings.json (not settings.local.json).
 
+# Reset hooks and env before rebuilding (idempotent across re-runs)
+jq '.hooks = {} | .env = {}' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+    && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+
 # Merge hydrated template (hooks, env, additionalDirectories) into settings.json
 if [ "$HYDRATED_SETTINGS" != "{}" ]; then
     jq --argjson tmpl "$HYDRATED_SETTINGS" '
@@ -945,6 +949,7 @@ fi
 # auto-discovers plugin components when cwd matches the project root.
 PROJECT_PLUGINS_COUNT=0
 declare -a PROJECT_PLUGIN_DETAIL_LINES=()
+declare -a PROJECT_HOOKS_PENDING=()
 
 if [ -d "$WORKSPACE_ROOT/projects" ]; then
     for project_dir in "$WORKSPACE_ROOT/projects"/*/; do
@@ -1020,16 +1025,14 @@ if [ -d "$WORKSPACE_ROOT/projects" ]; then
                 pp_agents=$(find "$plugin_dir/agents" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
             fi
 
-            # Merge hooks from hooks/hooks.json into settings.json
+            # Merge hooks from hooks/hooks.json directly into settings.json
+            # hooks.json uses settings.json format (objects with matcher + hooks sub-array),
+            # so we concatenate directly — NOT through PLUGIN_HOOKS which uses the flat format.
             if [ -f "$plugin_dir/hooks/hooks.json" ]; then
                 HOOKS_JSON=$(cat "$plugin_dir/hooks/hooks.json")
                 if jq empty <<< "$HOOKS_JSON" &>/dev/null; then
-                    PLUGIN_HOOKS=$(jq -n --argjson acc "$PLUGIN_HOOKS" --argjson new "$HOOKS_JSON" '
-                        $new | to_entries | reduce .[] as $entry ($acc;
-                            .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
-                        )
-                    ' 2>/dev/null || echo "$PLUGIN_HOOKS")
                     pp_hooks=$(jq 'to_entries | map(.value | length) | add // 0' <<< "$HOOKS_JSON")
+                    PROJECT_HOOKS_PENDING+=("$HOOKS_JSON")
                 fi
             fi
 
@@ -1069,19 +1072,18 @@ if [ -d "$WORKSPACE_ROOT/projects" ]; then
     done
 fi
 
-# Re-merge plugin hooks into settings.json (project plugins may have added new hooks)
-if [ "$PROJECT_PLUGINS_COUNT" -gt 0 ] && [ "$PLUGIN_HOOKS" != "{}" ]; then
-    # Rebuild hooks from scratch: start with template hooks, then overlay all accumulated plugin hooks
-    jq --argjson plugin_hooks "$PLUGIN_HOOKS" '
-        reduce ($plugin_hooks | to_entries[]) as $entry (.;
-            .hooks[$entry.key] = (
-                [.hooks[$entry.key] // [] | .[] | select(has("hooks") | not)] +
-                [{"hooks": $entry.value}]
+# Merge project plugin hooks directly into settings.json
+# hooks.json files are already in settings format — just concatenate arrays per event.
+if [ ${#PROJECT_HOOKS_PENDING[@]} -gt 0 ]; then
+    for hooks_json in "${PROJECT_HOOKS_PENDING[@]}"; do
+        jq --argjson new "$hooks_json" '
+            reduce ($new | to_entries[]) as $entry (.;
+                .hooks[$entry.key] = ((.hooks[$entry.key] // []) + $entry.value)
             )
-        )
-    ' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
-        && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
-    echo "[install] Re-merged hooks (including project plugins) into settings.json"
+        ' "$CLAUDE_DIR/settings.json" > "$CLAUDE_DIR/settings.json.tmp" \
+            && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+    done
+    echo "[install] Merged project plugin hooks into settings.json"
 fi
 
 # Print summary
