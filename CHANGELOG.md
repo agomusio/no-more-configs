@@ -8,6 +8,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versio
 
 ## [1.0.1] - Unreleased
 
+### Fixed
+
+- `langfuse-setup` MinIO/ClickHouse data directory ownership — replaced busybox chown (broken in Docker-outside-of-Docker) with direct `sudo chown`
+- GSD framework not updating on container rebuild — now updates to latest on every container start
+
 ### Changed
 
 - `config.json` no longer ships in repo — created at runtime by `save-config` and `save-secrets`; example files serve as reference
@@ -24,7 +29,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versio
 
 ### Added
 
-- `CHANGELOG.md`
+- `CHANGELOG.md` — project history and release notes
+- `TROUBLESHOOTING.md` — common Docker Desktop, WSL2, networking, and filesystem issues with fixes
 
 ---
 
