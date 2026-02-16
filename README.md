@@ -476,6 +476,15 @@ Handled automatically. If it recurs: `git config --global --add safe.directory '
 
 ---
 
+## Known Issues
+
+| Issue | Cause | Status |
+|-------|-------|--------|
+| Claude Code Edit tool throws `ENOENT: no such file or directory` on files that exist | WSL2 bind mount (C:\ → 9P → container) causes stale file metadata; the Edit tool's freshness check sees a mismatched mtime and rejects the write | Intermittent, self-healing (re-read + retry succeeds). Likely resolved in a future Claude Code update. |
+| Lifecycle terminal closes before you can read output | VS Code dismisses the postCreate/postStart terminal on completion | Use `slc` / `sls` aliases to view saved logs from `/tmp/devcontainer-logs/` |
+
+---
+
 ## Acknowledgments
 
 - **Dev Container** — Modified from the official [Claude Code Dev Container](https://github.com/anthropics/claude-code) reference configuration.
