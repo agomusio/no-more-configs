@@ -6,6 +6,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versio
 
 ---
 
+## [1.0.2] - 2026-02-16
+
+### Changed
+
+- `gitprojects/` renamed to `projects/` — simpler, less confusing for new users
+- `save-secrets` now captures GitHub CLI credentials; restored automatically on rebuild
+- README version badge now auto-updates from GitHub releases
+
+### Removed
+
+- `config.example.json`, `secrets.example.json` — schema is documented inline in the README
+
+---
+
 ## [1.0.1] - 2026-02-16
 
 ### Fixed
@@ -78,5 +92,6 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.0.1]: https://github.com/agomusio/no-more-configs/compare/v1.0.0...HEAD
+[1.0.2]: https://github.com/agomusio/no-more-configs/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/agomusio/no-more-configs/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/agomusio/no-more-configs/releases/tag/v1.0.0
