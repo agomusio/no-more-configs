@@ -18,7 +18,7 @@ You                         Container
 
 ## What You Get
 
-- **Claude Code** (latest) — Anthropic's agentic coding CLI, pre-configured with bypass permissions, Opus model, high effort
+- **Claude Code** (latest) — Anthropic's agentic coding CLI, pre-configured with bypass permissions, Opus 4.6, high effort
 - **Codex CLI** (latest) — OpenAI's agentic coding CLI (GPT-5.3-Codex), pre-configured with full-auto mode
 - **Plugin system** — drop a directory in `agent-config/plugins/` with a `plugin.json` manifest to register hooks, env vars, commands, agents, and MCP servers
 - **Langfuse** self-hosted observability — every conversation traced to a local dashboard (runs as a plugin, optional)
@@ -85,7 +85,7 @@ This generates credentials (into `secrets.json`), starts the stack, and verifies
 Start coding:
 
 ```bash
-claude                         # Claude Code (Opus, high effort, permissions bypassed)
+claude                         # Claude Code (Opus 4.6, high effort, permissions bypassed)
 clauder                        # Resume last Claude session
 codex                          # Codex CLI (GPT-5.3-Codex, full-auto mode)
 codexr                         # Resume last Codex session
@@ -150,7 +150,7 @@ Both CLI agents are pre-configured for container use — no interactive prompts 
 | Setting | Claude Code | Codex CLI |
 |---------|-------------|-----------|
 | **Permissions** | Bypassed (`bypassPermissions` in settings) | Bypassed (`approval_policy = "never"`) |
-| **Model** | Opus (high effort) | `gpt-5.3-codex` (configurable via `config.json`) |
+| **Model** | Opus 4.6 (high effort) | GPT-5.3-Codex (configurable via `config.json`) |
 | **Credentials** | `~/.claude/.credentials.json` | `~/.codex/auth.json` (file-based, no keyring) |
 | **Onboarding** | Skipped when credentials present | Workspace pre-trusted |
 
@@ -355,7 +355,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 
 | Command          | Action                                                                  |
 | ---------------- | ----------------------------------------------------------------------- |
-| `claude`         | Claude Code — Opus, high effort, permissions bypassed                   |
+| `claude`         | Claude Code — Opus 4.6, high effort, permissions bypassed               |
 | `clauder`        | Alias for `claude --resume`                                             |
 | `codex`          | Codex CLI — GPT-5.3-Codex, full-auto, no sandbox                        |
 | `codexr`         | Alias for `codex --resume`                                              |
