@@ -15,7 +15,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versio
 
 ### Changed
 
-- `config.json` no longer ships in repo — created at runtime by `save-config` and `save-secrets`; example files serve as reference
+- `config.json` no longer ships in repo — created at runtime by `save-config` and `save-secrets`
 - README fully redesigned — centered header, shields.io badges, feature matrix, value proposition
 - Copyright year corrected to 2026
 - Platform support clarified — tested on Windows (WSL2), macOS/Linux untested

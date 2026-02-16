@@ -139,7 +139,7 @@ Your projects go in `gitprojects/`. Clone repos there and they'll be auto-detect
 
 Everything is driven by two files at the repo root:
 
-**`config.json`** — non-secret settings (created by `save-config`, see `config.example.json`):
+**`config.json`** — non-secret settings (created by `save-config`):
 
 ```json
 {
@@ -437,8 +437,6 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │   ├── skills/                 # Standalone skills (Claude + Codex)
 │   └── commands/               # Standalone slash commands
 │
-├── config.example.json         # Annotated config reference
-├── secrets.example.json        # Secret schema reference
 │
 ├── infra/                      # Langfuse + MCP gateway stack
 │   ├── docker-compose.yml
