@@ -10,7 +10,16 @@ templates_dir="${workspace}/agent-config/mcp-templates"
 
 mkdir -p "$claude_dir"
 
-# Generate .mcp.json from enabled MCP templates (same logic as install-agent-config.sh)
+# Load existing .mcp.json (written by install-agent-config.sh, may contain plugin servers)
+EXISTING_MCP=$(cat "$claude_dir/.mcp.json" 2>/dev/null || echo '{"mcpServers":{}}')
+
+# Extract and preserve plugin servers (identified by _source tag starting with "plugin:")
+PLUGIN_SERVERS=$(echo "$EXISTING_MCP" | jq '.mcpServers |
+    with_entries(select(.value._source? // "" | startswith("plugin:")))' 2>/dev/null || echo '{}')
+
+PLUGIN_COUNT=$(echo "$PLUGIN_SERVERS" | jq 'length' 2>/dev/null || echo "0")
+
+# Build base servers from config.json templates (refreshed each start)
 MCP_JSON='{"mcpServers":{}}'
 MCP_COUNT=0
 
@@ -31,14 +40,25 @@ if [ -f "$config_file" ]; then
     fi
 fi
 
-# Fallback: if no servers were added, include mcp-gateway as default
-if [ "$MCP_COUNT" -eq 0 ]; then
-    MCP_JSON='{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$gateway_url"'/sse"}}}'
-    MCP_COUNT=1
+# Merge: plugin servers (preserved from install) + base servers (refreshed)
+# Plugin servers take precedence (they are plugin-owned)
+FINAL_MCP=$(jq -n --argjson plugins "$PLUGIN_SERVERS" --argjson base "$MCP_JSON" \
+    '{mcpServers: ($plugins + $base.mcpServers)}')
+
+# Fallback: if no servers at all, add default mcp-gateway
+TOTAL_COUNT=$(echo "$FINAL_MCP" | jq '.mcpServers | length')
+if [ "$TOTAL_COUNT" -eq 0 ]; then
+    FINAL_MCP='{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$gateway_url"'/sse"}}}'
+    TOTAL_COUNT=1
 fi
 
-echo "$MCP_JSON" | jq '.' > "${claude_dir}/.mcp.json"
-echo "✓ Generated ${claude_dir}/.mcp.json with $MCP_COUNT server(s)"
+echo "$FINAL_MCP" | jq '.' > "${claude_dir}/.mcp.json"
+
+if [ "$PLUGIN_COUNT" -gt 0 ]; then
+    echo "✓ Generated ${claude_dir}/.mcp.json with $TOTAL_COUNT server(s) ($PLUGIN_COUNT plugin, $MCP_COUNT base)"
+else
+    echo "✓ Generated ${claude_dir}/.mcp.json with $TOTAL_COUNT server(s)"
+fi
 
 # Poll gateway health endpoint with retry logic
 echo "Checking gateway health at ${gateway_url}/health..."
