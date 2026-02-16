@@ -265,6 +265,43 @@ if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
         > "$CLAUDE_DIR/settings.json"
 fi
 
+# --- Download upstream plugins (if not already present) ---
+UPSTREAM_REPO="https://github.com/anthropics/claude-code.git"
+UPSTREAM_PLUGINS=("plugin-dev" "frontend-design")
+UPSTREAM_SPARSE_PATHS=()
+UPSTREAM_NEEDED=()
+
+for up_name in "${UPSTREAM_PLUGINS[@]}"; do
+    if [ -d "$AGENT_CONFIG_DIR/plugins/$up_name" ]; then
+        echo "[install] Upstream plugin '$up_name': already present, skipping download"
+    else
+        UPSTREAM_SPARSE_PATHS+=("plugins/$up_name")
+        UPSTREAM_NEEDED+=("$up_name")
+    fi
+done
+
+UPSTREAM_STATUS="present"
+if [ ${#UPSTREAM_NEEDED[@]} -gt 0 ]; then
+    UPSTREAM_TMP=$(mktemp -d)
+    echo "[install] Downloading upstream plugins: ${UPSTREAM_NEEDED[*]}"
+    if git clone --depth 1 --filter=blob:none --sparse "$UPSTREAM_REPO" "$UPSTREAM_TMP" 2>/dev/null; then
+        ( cd "$UPSTREAM_TMP" && git sparse-checkout set "${UPSTREAM_SPARSE_PATHS[@]}" 2>/dev/null )
+        for up_name in "${UPSTREAM_NEEDED[@]}"; do
+            if [ -d "$UPSTREAM_TMP/plugins/$up_name" ]; then
+                cp -r "$UPSTREAM_TMP/plugins/$up_name" "$AGENT_CONFIG_DIR/plugins/$up_name"
+                echo "[install] Upstream plugin '$up_name': downloaded"
+            else
+                echo "[install] WARNING: Upstream plugin '$up_name' not found in repo"
+            fi
+        done
+        UPSTREAM_STATUS="downloaded ${UPSTREAM_NEEDED[*]}"
+    else
+        echo "[install] WARNING: Could not reach GitHub — upstream plugins unavailable"
+        UPSTREAM_STATUS="failed (GitHub unreachable)"
+    fi
+    rm -rf "$UPSTREAM_TMP"
+fi
+
 # --- Plugin Installation ---
 declare -A PLUGIN_FILE_OWNERS=()
 declare -a PLUGIN_DETAIL_LINES=()
@@ -893,6 +930,7 @@ echo "[install] Preferences: $CC_PREFS_STATUS"
 echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
 echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
+echo "[install] Upstream plugins: $UPSTREAM_STATUS"
 echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 if [ ${#PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
     for detail_line in "${PLUGIN_DETAIL_LINES[@]}"; do

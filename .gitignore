@@ -30,5 +30,9 @@ secrets.json
 .vscode/
 .devcontainer/firewall-domains.conf
 
+# Upstream plugins (downloaded at install time from anthropics/claude-code)
+agent-config/plugins/plugin-dev/
+agent-config/plugins/frontend-design/
+
 # Host-side Claude Code artifacts (not part of container config)
 .claude/
