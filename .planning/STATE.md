@@ -65,8 +65,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Completed 04-03-PLAN.md
-Resume file: .planning/phases/04-core-plugin-system/04-03-SUMMARY.md
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-mcp-integration/05-CONTEXT.md
 
 ---
 *State updated: 2026-02-15 for milestone v1.2*
