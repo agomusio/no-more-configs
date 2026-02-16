@@ -21,22 +21,6 @@ cd no-more-configs && code .
 
 <br>
 
-```
-You                         Container
- |                           |-- Claude Code CLI + Codex CLI
- |-- config.json ----------> |-- Firewall domains
- |   (settings)              |-- VS Code settings
- |                           |-- MCP server config
- |-- secrets.json ----------> |-- Claude + Codex auth tokens
- |   (credentials)           |-- Git identity
- |                           |-- Plugin env vars (hydrated)
- |-- agent-config/plugins/ -> \-- Hooks, commands, agents, skills, MCP
- |   (self-registering)
- \-- Open in Container -----> Done.
-```
-
-<br>
-
 *"I spent a week configuring Claude Code in Docker. This would have taken me five minutes."*
 
 <br>
@@ -44,6 +28,20 @@ You                         Container
 [What You Get](#what-you-get) · [Quick Start](#quick-start) · [How It Works](#how-it-works) · [Plugin System](#plugin-system) · [Customization](#customization)
 
 </div>
+
+```
+You                         Container
+ │                           ├── Claude Code CLI + Codex CLI
+ ├── config.json ──────────► ├── Firewall domains
+ │   (settings)              ├── VS Code settings
+ │                           ├── MCP server config
+ ├── secrets.json ─────────► ├── Claude + Codex auth tokens
+ │   (credentials)           ├── Git identity
+ │                           ├── Plugin env vars (hydrated)
+ ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP
+ │   (self-registering)
+ └── Open in Container ────► Done.
+```
 
 ---
 
