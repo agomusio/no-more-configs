@@ -345,6 +345,8 @@ tail -50 ~/.claude/state/langfuse_hook.log
 | `save-secrets` | Capture live credentials, git identity, and keys to `secrets.json` |
 | `langfuse-setup` | Generate secrets, start Langfuse stack, verify health |
 | `mcp-setup` | Regenerate `.mcp.json` from templates and health-check MCP gateway |
+| `slc` | Show postCreate lifecycle log (`/tmp/devcontainer-logs/postCreate.log`) |
+| `sls` | Show postStart lifecycle log (`/tmp/devcontainer-logs/postStart.log`) |
 
 ---
 
