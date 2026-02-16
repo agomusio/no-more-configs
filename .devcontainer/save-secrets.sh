@@ -46,6 +46,26 @@ else
     echo "[save-secrets] Codex credentials: not found (run 'codex' to authenticate)"
 fi
 
+# Capture GitHub CLI credentials
+GH_HOSTS_FILE="/home/node/.config/gh/hosts.yml"
+if [ -f "$GH_HOSTS_FILE" ]; then
+    GH_TOKEN=$(grep -oP 'oauth_token:\s*\K.*' "$GH_HOSTS_FILE" 2>/dev/null || echo "")
+    GH_USER=$(grep -oP 'user:\s*\K.*' "$GH_HOSTS_FILE" 2>/dev/null || echo "")
+    GH_PROTO=$(grep -oP 'git_protocol:\s*\K.*' "$GH_HOSTS_FILE" 2>/dev/null || echo "https")
+    if [ -n "$GH_TOKEN" ]; then
+        SECRETS=$(echo "$SECRETS" | jq \
+            --arg token "$GH_TOKEN" \
+            --arg user "$GH_USER" \
+            --arg proto "$GH_PROTO" \
+            '.gh = { oauth_token: $token, user: $user, git_protocol: $proto }')
+        echo "[save-secrets] GitHub CLI credentials: captured ($GH_USER)"
+    else
+        echo "[save-secrets] GitHub CLI credentials: no token found"
+    fi
+else
+    echo "[save-secrets] GitHub CLI credentials: not found (run 'gh auth login' to authenticate)"
+fi
+
 # Capture infrastructure secrets from infra/.env (includes Langfuse project keys)
 INFRA_ENV="/workspace/infra/.env"
 if [ -f "$INFRA_ENV" ]; then

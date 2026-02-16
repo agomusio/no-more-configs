@@ -711,6 +711,26 @@ else
     echo "[install] Codex credentials not found — manual login required after first start"
 fi
 
+# Restore GitHub CLI credentials from secrets.json
+if [ -f "$SECRETS_FILE" ]; then
+    GH_TOKEN=$(jq -r '.gh.oauth_token // ""' "$SECRETS_FILE" 2>/dev/null || echo "")
+    GH_USER=$(jq -r '.gh.user // ""' "$SECRETS_FILE" 2>/dev/null || echo "")
+    GH_PROTO=$(jq -r '.gh.git_protocol // "https"' "$SECRETS_FILE" 2>/dev/null || echo "https")
+    if [ -n "$GH_TOKEN" ]; then
+        mkdir -p /home/node/.config/gh
+        cat > /home/node/.config/gh/hosts.yml << GHEOF
+github.com:
+    oauth_token: $GH_TOKEN
+    user: $GH_USER
+    git_protocol: $GH_PROTO
+GHEOF
+        chmod 600 /home/node/.config/gh/hosts.yml
+        echo "[install] GitHub CLI credentials restored ($GH_USER)"
+    else
+        echo "[install] GitHub CLI credentials not found — run 'gh auth login' to authenticate"
+    fi
+fi
+
 # Restore git identity from secrets.json
 if [ -f "$SECRETS_FILE" ]; then
     GIT_NAME=$(jq -r '.git.name // ""' "$SECRETS_FILE" 2>/dev/null || echo "")
