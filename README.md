@@ -2,7 +2,7 @@
 
 # NO MORE CONFIGS
 
-**A clone-and-go VS Code devcontainer for agentic coding with Claude Code and Codex CLI.**
+**A clone-and-go VS Code devcontainer built for Claude Code. Codex CLI included as an optional second agent.**
 
 **Clone. Open. Code.**
 
@@ -21,7 +21,7 @@ cd no-more-configs && code .</pre>
 
 <br>
 
-*"I spent a week configuring Claude Code in Docker. This would have taken me five minutes."*
+_"I spent a week configuring Claude Code in Docker. This would have taken me five minutes."_
 
 <br>
 
@@ -30,34 +30,34 @@ cd no-more-configs && code .</pre>
 </div>
 
 ```
-            You                         Container
-             │                           ├── Claude Code CLI + Codex CLI
-             ├── config.json ──────────► ├── Firewall domains
-             │   (settings)              ├── VS Code settings
-             │                           ├── MCP server config
-             ├── secrets.json ─────────► ├── Claude + Codex auth tokens
-             │   (credentials)           ├── Git identity
-             │                           ├── Plugin env vars (hydrated)
-             ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP
-             │   (self-registering)
-             └── Open in Container ────► Done.
+                  You                         Container
+                   │                           ├── Claude Code CLI + Codex CLI
+                   ├── config.json ──────────► ├── Firewall domains
+                   │   (settings)              ├── VS Code settings
+                   │                           ├── MCP server config
+                   ├── secrets.json ─────────► ├── Claude + Codex auth tokens
+                   │   (credentials)           ├── Git identity
+                   │                           ├── Plugin env vars (hydrated)
+                   ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP
+                   │   (self-registering)
+                   └── Open in Container ────► Done.
 ```
 
 ---
 
 ## What You Get
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Claude Code** | Anthropic's agentic coding CLI — Opus 4.6, high effort, permissions bypassed | Out of the box |
-| **Codex CLI** | OpenAI's agentic coding CLI — GPT-5.3-Codex, full-auto mode | Out of the box |
-| **Plugin system** | Drop a directory with a `plugin.json` to register hooks, env vars, commands, agents, MCP servers | Out of the box |
-| **GSD framework** | 30+ slash commands and 11 specialized agents for structured development | Out of the box |
-| **iptables firewall** | Default-deny network with domain whitelist (31 core domains) | Out of the box |
-| **Oh-My-Zsh** | Powerlevel10k, fzf, git-delta, GitHub CLI | Out of the box |
-| **Langfuse observability** | Self-hosted tracing — every conversation traced to a local dashboard | Opt-in |
-| **MCP gateway** | Model Context Protocol tool access via Docker MCP Gateway | Opt-in |
-| **Codex MCP server** | Let Claude delegate to Codex mid-session | Opt-in |
+| Feature                    | Description                                                                                      | Status         |
+| -------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| **Claude Code**            | Anthropic's agentic coding CLI — Opus 4.6, high effort, permissions bypassed. **Only requires a Claude Pro/Max subscription.** | Out of the box |
+| **Codex CLI**              | OpenAI's agentic coding CLI — GPT-5.3-Codex, full-auto mode. Optional, requires separate ChatGPT Plus/Pro subscription.       | Out of the box |
+| **Plugin system**          | Drop a directory with a `plugin.json` to register hooks, env vars, commands, agents, MCP servers | Out of the box |
+| **GSD framework**          | 30+ slash commands and 11 specialized agents for structured development                          | Out of the box |
+| **iptables firewall**      | Default-deny network with domain whitelist (31 core domains)                                     | Out of the box |
+| **Oh-My-Zsh**              | Powerlevel10k, fzf, git-delta, GitHub CLI                                                        | Out of the box |
+| **Langfuse observability** | Self-hosted tracing — every conversation traced to a local dashboard                             | Opt-in         |
+| **MCP gateway**            | Model Context Protocol tool access via Docker MCP Gateway                                        | Opt-in         |
+| **Codex MCP server**       | Let Claude delegate to Codex mid-session                                                         | Opt-in         |
 
 ---
 
@@ -83,11 +83,16 @@ First build takes a few minutes. Subsequent opens are fast.
 
 ### 2. Authenticate
 
-Once the container is running, authenticate the CLI agents you want to use:
+Once the container is running, authenticate Claude Code:
 
 ```bash
-claude          # Follow OAuth prompts (Claude Pro/Max subscription)
-codex           # Follow OAuth prompts (ChatGPT Plus/Pro subscription)
+claude          # Follow OAuth prompts (requires Claude Pro/Max subscription)
+```
+
+Optionally, authenticate Codex CLI if you have a ChatGPT Plus/Pro subscription:
+
+```bash
+codex           # Follow OAuth prompts (optional — separate subscription)
 ```
 
 Set your git identity:
@@ -260,13 +265,13 @@ The install script validates plugins and provides clear feedback:
 
 ### Included Plugins
 
-| Plugin             | Description                                                                                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nmc`              | NMC system status command (`/nmc`)                                                                                                                               |
-| `nmc-langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)                                                                                              |
-| `plugin-dev`       | Plugin development guidance ([source](https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev))                                                   |
-| `nmc-ralph-loop`   | Ralph Wiggum technique for iterative, self-referential AI development loops (forked from [ralph-wiggum](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum)) |
-| `frontend-design`  | Frontend design skills and patterns ([source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design))                                      |
+| Plugin                 | Description                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nmc`                  | NMC system status command (`/nmc`)                                                                                                                                                 |
+| `nmc-langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)                                                                                                                |
+| `plugin-dev`           | Plugin development guidance ([source](https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev))                                                                     |
+| `nmc-ralph-loop`       | Ralph Wiggum technique for iterative, self-referential AI development loops (forked from [ralph-wiggum](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum)) |
+| `frontend-design`      | Frontend design skills and patterns ([source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design))                                                        |
 
 ---
 
@@ -371,7 +376,7 @@ Plugin MCP servers are registered automatically and persist across container res
 
 ## GSD Framework
 
-[Get Shit Done](https://github.com/glittercowboy/get-shit-done) is a project management framework for Claude Code that breaks work into atomic tasks sized for fresh context windows.
+[Get Shit Done](https://github.com/glittercowboy/get-shit-done) is a project management framework for Claude Code that breaks work into atomic tasks sized for fresh context windows, while logging everything in `.planning/` via Markdown.
 
 **Key commands:** `/gsd:new-project`, `/gsd:plan-phase`, `/gsd:execute-phase`, `/gsd:verify-work`, `/gsd:progress`
 
