@@ -161,8 +161,8 @@ RUN sudo cp /tmp/langfuse-setup.sh /usr/local/bin/langfuse-setup && \
 # Shell aliases
 RUN echo "alias clauder='claude --resume'" >> /home/node/.bashrc && \
     echo "alias clauder='claude --resume'" >> /home/node/.zshrc && \
-    echo "alias codexr='codex --resume'" >> /home/node/.bashrc && \
-    echo "alias codexr='codex --resume'" >> /home/node/.zshrc && \
+    echo "alias codexr='codex resume'" >> /home/node/.bashrc && \
+    echo "alias codexr='codex resume'" >> /home/node/.zshrc && \
     echo "alias slc='cat /tmp/devcontainer-logs/postCreate.log'" >> /home/node/.bashrc && \
     echo "alias slc='cat /tmp/devcontainer-logs/postCreate.log'" >> /home/node/.zshrc && \
     echo "alias sls='cat /tmp/devcontainer-logs/postStart.log'" >> /home/node/.bashrc && \

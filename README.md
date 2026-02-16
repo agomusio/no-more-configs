@@ -24,7 +24,7 @@ You                         Container
 - **Langfuse** self-hosted observability — every conversation traced to a local dashboard (runs as a plugin, optional)
 - **MCP gateway** for Model Context Protocol tool access
 - **Codex MCP server** — lets Claude delegate to Codex mid-session (optional, enable in config.json)
-- **GSD framework** — 28 slash commands and 11 specialized agents for structured development
+- **GSD framework** — 30+ slash commands and 11 specialized agents for structured development
 - **iptables firewall** — default-deny network with domain whitelist
 - **Oh-My-Zsh** with Powerlevel10k, fzf, git-delta, GitHub CLI
 
@@ -86,9 +86,9 @@ Start coding:
 
 ```bash
 claude                         # Claude Code (Opus 4.6, high effort, permissions bypassed)
-clauder                        # Resume last Claude session
+clauder                        # Resume a recent Claude session
 codex                          # Codex CLI (GPT-5.3-Codex, full-auto mode)
-codexr                         # Resume last Codex session
+codexr                         # Resume a recent Codex session
 ```
 
 Your projects go in `gitprojects/`. Clone repos there and they'll be auto-detected by VS Code's git scanner.
@@ -111,7 +111,7 @@ Everything is driven by two files at the repo root:
   "vscode": { "git_scan_paths": ["gitprojects/my-project"] },
   "mcp_servers": {
     "mcp-gateway": { "enabled": true },
-    "codex": { "enabled": false }
+    "codex": { "enabled": false, "targets": ["claude"] }
   },
   "plugins": { "langfuse-tracing": { "enabled": true, "env": {} } }
 }
@@ -152,6 +152,7 @@ Both CLI agents are pre-configured for container use — no interactive prompts 
 | **Permissions** | Bypassed (`bypassPermissions` in settings) | Bypassed (`approval_policy = "never"`)         |
 | **Model**       | Opus 4.6 (high effort)                     | GPT-5.3-Codex (configurable via `config.json`) |
 | **Credentials** | `~/.claude/.credentials.json`              | `~/.codex/auth.json` (file-based, no keyring)  |
+| **MCP**         | `~/.claude/.mcp.json`                      | `config.toml [mcp_servers.*]`                  |
 | **Onboarding**  | Skipped when credentials present           | Workspace pre-trusted                          |
 
 ---
@@ -264,9 +265,9 @@ Host (Docker Desktop)
      ├── langfuse-worker       :3030
      ├── docker-mcp-gateway    :8811
      ├── postgres              :5433
-     ├── clickhouse            :8124
+     ├── clickhouse            :8124 (HTTP) / :9000 (native)
      ├── redis                 :6379
-     └── minio                 :9090
+     └── minio                 :9090 (API) / :9091 (console)
 ```
 
 The dev container and sidecar services are sibling containers on the same Docker engine. They communicate via `host.docker.internal`.
@@ -316,12 +317,22 @@ Enable a template server:
 {
   "mcp_servers": {
     "mcp-gateway": { "enabled": true },
-    "codex": { "enabled": true }
+    "codex": { "enabled": true, "targets": ["claude"] }
   }
 }
 ```
 
-Plugin MCP servers are registered automatically and persist across container restarts. The `mcp-setup` command regenerates base template servers on every container start while preserving plugin servers.
+### Server Targeting
+
+By default, enabled MCP servers are configured for both Claude Code (`~/.claude/.mcp.json`) and Codex CLI (`config.toml [mcp_servers.*]`). To restrict a server to a specific agent, add `targets`:
+
+```json
+{ "mcp-gateway": { "enabled": true, "targets": ["codex"] } }
+```
+
+Valid targets: `"claude"`, `"codex"`. Default (when `targets` is omitted): both agents. The `codex` MCP server template should always target `["claude"]` since it would be circular for Codex to have itself as an MCP server.
+
+Plugin MCP servers are registered automatically and persist across container restarts. The `mcp-setup` command regenerates base template servers on every container start for both agents while preserving plugin servers.
 
 ---
 
@@ -358,10 +369,10 @@ tail -50 ~/.claude/state/langfuse_hook.log
 | `claude`         | Claude Code — Opus 4.6, high effort, permissions bypassed               |
 | `clauder`        | Alias for `claude --resume`                                             |
 | `codex`          | Codex CLI — GPT-5.3-Codex, full-auto, no sandbox                        |
-| `codexr`         | Alias for `codex --resume`                                              |
+| `codexr`         | Alias for `codex resume`                                                |
 | `save-secrets`   | Capture live credentials, git identity, and keys to `secrets.json`      |
 | `langfuse-setup` | Generate secrets, start Langfuse stack, verify health                   |
-| `mcp-setup`      | Regenerate `.mcp.json` from templates and health-check MCP gateway      |
+| `mcp-setup`      | Regenerate MCP configs (Claude + Codex) and health-check gateway        |
 | `slc`            | Show postCreate lifecycle log (`/tmp/devcontainer-logs/postCreate.log`) |
 | `sls`            | Show postStart lifecycle log (`/tmp/devcontainer-logs/postStart.log`)   |
 

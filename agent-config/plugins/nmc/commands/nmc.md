@@ -59,22 +59,32 @@ For each hook command, verify the script file exists using Bash `test -f`. If mi
 
 ## Section: mcp
 
-Show configured MCP servers.
+Show configured MCP servers for both agents.
 
+**Claude MCP Servers:**
 1. Read `/home/node/.claude/.mcp.json` and extract `.mcpServers`
-2. For each server, display:
-   - Name
-   - Type: "sse" if it has a `url` field, "stdio" if it has a `command` field
-   - Connection: the url or command + first few args
+2. For each server, display name, type (sse/stdio), and connection
+
+**Codex MCP Servers:**
+1. Read `/home/node/.codex/config.toml` and extract `[mcp_servers.*]` sections
+2. For each server, display name, type (url/command), and connection
 
 ```
 ## MCP Servers
 
+### Claude (.mcp.json)
 | Server | Type | Connection |
 |--------|------|------------|
 | mcp-gateway | sse | http://host.docker.internal:8811/sse |
 | codex | stdio | npx -y codex-mcp-server |
+
+### Codex (config.toml)
+| Server | Type | Connection |
+|--------|------|------------|
+| mcp-gateway | url | http://host.docker.internal:8811/sse |
 ```
+
+Note: Servers with `"targets"` in `config.json` may appear in only one agent's config.
 
 ## Section: env
 

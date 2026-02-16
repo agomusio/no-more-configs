@@ -36,7 +36,7 @@
 │       │   └── public/                 # Static files
 │       ├── package.json                # Dashboard dependencies
 │       ├── tsconfig.json
-│       └── next.config.js
+│       └── next.config.ts
 ├── packages/
 │   ├── api/                            # Cloudflare Workers API
 │   │   ├── src/

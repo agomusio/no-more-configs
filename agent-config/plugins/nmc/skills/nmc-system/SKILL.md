@@ -49,7 +49,8 @@ On container creation, `install-agent-config.sh` reads both files and generates:
 - `~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/commands/`, `~/.claude/agents/` (copied from `agent-config/` + plugins)
 - `.devcontainer/firewall-domains.conf` (core domains + `config.json` extras)
 - `.vscode/settings.json` (git scan paths from `config.json` + auto-detected repos)
-- `.mcp.json` (MCP client config from enabled templates)
+- `~/.claude/.mcp.json` (Claude MCP server config from enabled templates)
+- `~/.codex/config.toml` (Codex config including `[mcp_servers.*]` from enabled templates)
 - `~/.claude/.credentials.json` (restored from `secrets.json`)
 - `~/.codex/auth.json` (restored from `secrets.json`)
 - `infra/.env` (generated from `secrets.json` infra section via `langfuse-setup --generate-env`)
@@ -175,9 +176,9 @@ On container creation, the install script:
 | `/workspace/agent-config/` | Version-controlled templates, skills, hooks, plugins |
 | `/home/node/.claude/` | Container-local Claude config (generated at build time) |
 | `/home/node/.codex/` | Codex CLI config and credentials |
-| `/home/node/.codex/config.toml` | Codex config (file-based credential store) |
+| `/home/node/.codex/config.toml` | Codex config (model, MCP servers, approval policy) |
 | `/home/node/.codex/auth.json` | Codex OAuth credentials (restored from secrets.json) |
-| `/home/node/.claude/commands/gsd/` | GSD slash commands (~28 commands) |
+| `/home/node/.claude/commands/gsd/` | GSD slash commands (30+) |
 | `/home/node/.claude/agents/gsd-*.md` | GSD specialized agents (11 agents) |
 | `/home/node/.claude/hooks/langfuse_hook.py` | Langfuse tracing hook |
 | `/home/node/.claude/settings.json` | Claude Code settings (hooks, env vars, permissions, model) |
@@ -245,10 +246,10 @@ On container creation, the install script:
 | `claude` | Runs with bypassPermissions by default (set in global settings.json) |
 | `clauder` | Alias for `claude --resume` |
 | `codex` | OpenAI Codex CLI — agentic coding with GPT-5.3-Codex |
-| `codexr` | Alias for `codex --resume` |
+| `codexr` | Alias for `codex resume` |
 | `save-secrets` | Capture live credentials to secrets.json |
 | `langfuse-setup` | Generate secrets, start Langfuse stack, verify health |
-| `mcp-setup` | Regenerate .mcp.json + gateway health check |
+| `mcp-setup` | Regenerate MCP configs (Claude .mcp.json + Codex config.toml) + gateway health check |
 
 ## Hooks
 
@@ -300,7 +301,7 @@ Note: No `~/.claude` bind mount. All Claude config is generated container-locall
 2. Git trust + line ending config
 3. `setup-network-checks.sh` — Langfuse pip install + connectivity checks
 4. `init-gsd.sh` — GSD command check
-5. `mcp-setup` — Regenerate .mcp.json + gateway health check
+5. `mcp-setup` — Regenerate MCP configs (Claude + Codex) + gateway health check
 
 ## Rebuild Behavior
 

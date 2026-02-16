@@ -22,7 +22,8 @@
       "enabled": true
     },
     "codex": {
-      "enabled": true
+      "enabled": true,
+      "targets": ["claude"]
     }
   },
   "plugins": {

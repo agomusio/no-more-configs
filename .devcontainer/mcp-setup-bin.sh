@@ -1,6 +1,15 @@
-#!/bin/sh
-# MCP setup script - regenerates .mcp.json from templates and checks gateway health
+#!/bin/bash
+# MCP setup script - regenerates .mcp.json and Codex config.toml MCP sections
 # Uses the same template system as install-agent-config.sh
+
+# Source shared MCP helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/lib-mcp.sh" ]; then
+    source "$SCRIPT_DIR/lib-mcp.sh"
+else
+    # Fallback: try workspace location
+    source "/workspace/.devcontainer/lib-mcp.sh" 2>/dev/null || true
+fi
 
 gateway_url="${MCP_GATEWAY_URL:-http://host.docker.internal:8811}"
 claude_dir="${HOME}/.claude"
@@ -9,6 +18,10 @@ config_file="${workspace}/config.json"
 templates_dir="${workspace}/agent-config/mcp-templates"
 
 mkdir -p "$claude_dir"
+
+# ============================================================================
+# CLAUDE: Regenerate .mcp.json
+# ============================================================================
 
 # Load existing .mcp.json (written by install-agent-config.sh, may contain plugin servers)
 EXISTING_MCP=$(cat "$claude_dir/.mcp.json" 2>/dev/null || echo '{"mcpServers":{}}')
@@ -28,6 +41,11 @@ if [ -f "$config_file" ]; then
 
     if [ -n "$ENABLED_SERVERS" ]; then
         for SERVER in $ENABLED_SERVERS; do
+            # Check targets — skip servers not targeting Claude
+            SERVER_CONFIG=$(jq --arg s "$SERVER" '.mcp_servers[$s]' "$config_file" 2>/dev/null || echo '{}')
+            if ! server_targets_agent "claude" "$SERVER_CONFIG"; then
+                continue
+            fi
             TEMPLATE_FILE="${templates_dir}/${SERVER}.json"
             if [ -f "$TEMPLATE_FILE" ]; then
                 HYDRATED=$(sed "s|{{MCP_GATEWAY_URL}}|$gateway_url|g" "$TEMPLATE_FILE")
@@ -55,10 +73,68 @@ fi
 echo "$FINAL_MCP" | jq '.' > "${claude_dir}/.mcp.json"
 
 if [ "$PLUGIN_COUNT" -gt 0 ]; then
-    echo "✓ Generated ${claude_dir}/.mcp.json with $TOTAL_COUNT server(s) ($PLUGIN_COUNT plugin, $MCP_COUNT base)"
+    echo "✓ Claude .mcp.json: $TOTAL_COUNT server(s) ($PLUGIN_COUNT plugin, $MCP_COUNT base)"
 else
-    echo "✓ Generated ${claude_dir}/.mcp.json with $TOTAL_COUNT server(s)"
+    echo "✓ Claude .mcp.json: $TOTAL_COUNT server(s)"
 fi
+
+# ============================================================================
+# CODEX: Regenerate config.toml MCP sections
+# ============================================================================
+
+CODEX_TOML="/home/node/.codex/config.toml"
+CODEX_MCP_COUNT=0
+
+if [ -f "$CODEX_TOML" ]; then
+    # Build new MCP section from templates (Codex-targeted)
+    MCP_SECTION=""
+    if [ -f "$config_file" ]; then
+        ENABLED_SERVERS=$(jq -r '.mcp_servers | to_entries[] | select(.value.enabled == true) | .key' "$config_file" 2>/dev/null || echo "")
+        for SERVER in $ENABLED_SERVERS; do
+            SERVER_CONFIG=$(jq --arg s "$SERVER" '.mcp_servers[$s]' "$config_file" 2>/dev/null || echo '{}')
+            if ! server_targets_agent "codex" "$SERVER_CONFIG"; then
+                continue
+            fi
+            TEMPLATE_FILE="${templates_dir}/${SERVER}.json"
+            if [ -f "$TEMPLATE_FILE" ]; then
+                HYDRATED=$(sed "s|{{MCP_GATEWAY_URL}}|$gateway_url|g" "$TEMPLATE_FILE")
+                MCP_SECTION="${MCP_SECTION}$(json_mcp_to_toml "$SERVER" "$HYDRATED")"
+                CODEX_MCP_COUNT=$((CODEX_MCP_COUNT + 1))
+            fi
+        done
+    fi
+
+    # Check if markers exist in config.toml
+    if grep -q "^# --- MCP servers (auto-generated) ---" "$CODEX_TOML" 2>/dev/null; then
+        # Replace content between markers
+        awk -v new_content="$MCP_SECTION" '
+            /^# --- MCP servers \(auto-generated\) ---/ {
+                print
+                if (new_content != "") print new_content
+                skip=1
+                next
+            }
+            /^# --- end MCP servers ---/ { skip=0 }
+            !skip { print }
+        ' "$CODEX_TOML" > "${CODEX_TOML}.tmp" && mv "${CODEX_TOML}.tmp" "$CODEX_TOML"
+    else
+        # Fallback: append MCP section at end (pre-existing config.toml without markers)
+        {
+            echo ""
+            echo "# --- MCP servers (auto-generated) ---"
+            echo "$MCP_SECTION"
+            echo "# --- end MCP servers ---"
+        } >> "$CODEX_TOML"
+    fi
+
+    echo "✓ Codex config.toml: $CODEX_MCP_COUNT MCP server(s)"
+else
+    echo "⚠ Codex config.toml not found — run install-agent-config.sh first"
+fi
+
+# ============================================================================
+# HEALTH CHECK
+# ============================================================================
 
 # Poll gateway health endpoint with retry logic
 echo "Checking gateway health at ${gateway_url}/health..."
@@ -74,7 +150,8 @@ else
 fi
 
 echo ""
-echo "Config: ${claude_dir}/.mcp.json"
-echo "Gateway: ${gateway_url}"
-echo "Next: Restart Claude Code session to pick up MCP tools"
+echo "Claude config: ${claude_dir}/.mcp.json"
+echo "Codex config:  ${CODEX_TOML}"
+echo "Gateway:       ${gateway_url}"
+echo "Next: Restart Claude/Codex session to pick up MCP tools"
 echo "To add servers: Edit ${LANGFUSE_STACK_DIR:-/workspace/infra}/mcp/mcp.json, restart gateway, then re-run mcp-setup"

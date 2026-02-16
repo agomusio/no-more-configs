@@ -33,7 +33,7 @@ The sandbox is a VS Code devcontainer running on Windows 11 via WSL2/Docker Desk
 - **Langfuse** tracing via `plugins/langfuse-tracing/` (Stop hook + env vars hydrated from secrets)
 - **MCP gateway** for tool access (plugin MCP servers persist across restarts)
 - **Firewall** with domain whitelist (27 core + extras from config.json)
-- **GSD framework** — 28 commands + 11 agents for structured development workflows
+- **GSD framework** — 30+ commands + 11 agents for structured development workflows
 - **Cross-agent skills** — deployed to both Claude and Codex
 
 ### Plugin System
