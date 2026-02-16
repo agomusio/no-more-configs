@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** All container configuration is generated from source files checked into the repo — plugins extend this with self-registering bundles.
-**Current focus:** Phase 4: Core Plugin System
+**Current focus:** Phase 5: MCP Integration
 
 ## Current Position
 
-Phase: 4 of 7 (Core Plugin System)
-Plan: 3 of 3 in current phase
+Phase: 5 of 7 (MCP Integration)
+Plan: 1 of 1 in current phase
 Status: Complete
-Last activity: 2026-02-15 — Completed 04-03-PLAN.md
+Last activity: 2026-02-16 — Completed 05-01-PLAN.md
 
-Progress: [███████░░░] 100% (Phase 4)
+Progress: [██████████] 100% (Phase 5)
 
 ## Performance Metrics
 
@@ -24,15 +24,16 @@ Progress: [███████░░░] 100% (Phase 4)
 - Total execution time: ~22 min
 
 **v1.2 Velocity:**
-- Total plans completed: 3
-- Average duration: 1.5 min
-- Total execution time: 0.08 hours
+- Total plans completed: 4
+- Average duration: 1.8 min
+- Total execution time: 0.12 hours
 
 **By Phase (v1.2):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 4. Core Plugin System | 3 | 4.7 min | 1.6 min |
+| 5. MCP Integration | 1 | 2.5 min | 2.5 min |
 
 ## Accumulated Context
 
@@ -53,6 +54,9 @@ Recent decisions affecting current work:
 - [Phase 04-03]: Env var merge uses += operator to add plugin env to template env
 - [Phase 04-03]: Plugin recap displayed before credential restoration
 - [Phase 04-03]: Install summary shows plugin count alongside other component counts
+- [Phase 05]: Plugin MCP servers use {{TOKEN}} placeholder format matching settings.json.template
+- [Phase 05]: MCP secret tokens hydrated via namespaced lookup: secrets.json[plugin-name][TOKEN]
+- [Phase 05]: Install script owns .mcp.json fully, mcp-setup preserves plugin entries via _source tag
 
 ### Pending Todos
 
@@ -64,9 +68,9 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-15
-Stopped at: Phase 5 planned (1 plan, 1 wave, verified)
-Resume file: .planning/phases/05-mcp-integration/05-01-PLAN.md
+Last session: 2026-02-16
+Stopped at: Completed 05-01-PLAN.md (Phase 5 complete)
+Resume file: None (Phase 5 complete, ready for Phase 6 or milestone close)
 
 ---
-*State updated: 2026-02-15 for milestone v1.2*
+*State updated: 2026-02-16 for milestone v1.2*
