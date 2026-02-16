@@ -281,9 +281,9 @@ full_setup() {
              "$INFRA_DIR/data/minio" \
              "$INFRA_DIR/data/postgres"
     # ClickHouse runs as user 101:101
-    docker run --rm -v "$INFRA_DIR/data/clickhouse:/data" busybox chown -R 101:101 /data
+    sudo chown -R 101:101 "$INFRA_DIR/data/clickhouse"
     # MinIO (chainguard) runs as user 65532
-    docker run --rm -v "$INFRA_DIR/data/minio:/data" busybox chown -R 65532:65532 /data
+    sudo chown -R 65532:65532 "$INFRA_DIR/data/minio"
     ok "Data directories ready"
 
     # Step 4: Start the stack
