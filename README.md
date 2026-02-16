@@ -561,6 +561,6 @@ Built on the shoulders of:
 
 <br>
 
-MIT License · Copyright (c) 2025 agomusio
+MIT License · Copyright (c) 2026 agomusio
 
 </div>
