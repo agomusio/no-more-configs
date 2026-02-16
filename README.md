@@ -19,7 +19,7 @@ git clone https://github.com/agomusio/no-more-configs.git
 cd no-more-configs && code .
 ```
 
-**Works on Windows (WSL2), macOS, and Linux.**
+**Tested on Windows (WSL2). macOS and Linux should work but are untested.**
 
 <br>
 
