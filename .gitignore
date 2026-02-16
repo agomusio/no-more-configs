@@ -23,7 +23,8 @@ __pycache__/
 # Langfuse persistent data (bind mounts)
 infra/data/
 
-# Sandbox secrets (credentials, API keys)
+# Runtime config and secrets (created by save-config / save-secrets)
+config.json
 secrets.json
 
 # Generated at runtime (install-agent-config.sh)
