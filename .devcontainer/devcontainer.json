@@ -44,7 +44,6 @@
       }
     }
   },
-  "unwantedExtensions": ["Anthropic.claude-code"],
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory,target=/commandhistory,type=volume",
