@@ -276,6 +276,7 @@ fi
 
 # --- Plugin Installation ---
 declare -A PLUGIN_FILE_OWNERS=()
+declare -a PLUGIN_DETAIL_LINES=()
 if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
     for plugin_dir in "$AGENT_CONFIG_DIR/plugins"/*/; do
         # Guard against empty directory
@@ -527,8 +528,10 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
         detail_str=$(IFS=", "; echo "${detail_parts[*]}")
         if [ -n "$detail_str" ]; then
             echo "[install] Plugin '$plugin_name': installed ($detail_str)"
+            PLUGIN_DETAIL_LINES+=("  $plugin_name: $detail_str")
         else
             echo "[install] Plugin '$plugin_name': installed (manifest only)"
+            PLUGIN_DETAIL_LINES+=("  $plugin_name: manifest only")
         fi
         PLUGIN_INSTALLED=$((PLUGIN_INSTALLED + 1))
 
@@ -540,36 +543,7 @@ fi
 
 # --- Plugin registrations are merged into settings.json after GSD install ---
 
-# Plugin installation recap
-if [ "$PLUGIN_INSTALLED" -gt 0 ] || [ "$PLUGIN_SKIPPED" -gt 0 ]; then
-    echo "[install] --- Plugin Recap ---"
-    echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
-
-    # Count total hook registrations
-    TOTAL_HOOK_REGS=0
-    if [ "$PLUGIN_HOOKS" != "{}" ]; then
-        TOTAL_HOOK_REGS=$(echo "$PLUGIN_HOOKS" | jq '[.[] | length] | add // 0' 2>/dev/null || echo "0")
-    fi
-    echo "[install] Hook registrations: $TOTAL_HOOK_REGS"
-
-    # Count total plugin env vars
-    TOTAL_PLUGIN_ENV=0
-    if [ "$PLUGIN_ENV" != "{}" ]; then
-        TOTAL_PLUGIN_ENV=$(echo "$PLUGIN_ENV" | jq 'length' 2>/dev/null || echo "0")
-    fi
-    echo "[install] Plugin env vars: $TOTAL_PLUGIN_ENV"
-
-    # Count total plugin MCP servers
-    TOTAL_PLUGIN_MCP=0
-    if [ "$PLUGIN_MCP" != "{}" ]; then
-        TOTAL_PLUGIN_MCP=$(echo "$PLUGIN_MCP" | jq 'length' 2>/dev/null || echo "0")
-    fi
-    echo "[install] Plugin MCP servers: $TOTAL_PLUGIN_MCP"
-
-    if [ "$PLUGIN_WARNINGS" -gt 0 ]; then
-        echo "[install] Warnings: $PLUGIN_WARNINGS"
-    fi
-fi
+# (Old plugin recap removed — details integrated into final summary)
 
 # Restore Claude credentials (if available)
 if [ -f "$SECRETS_FILE" ]; then
@@ -833,7 +807,25 @@ echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
 echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
 echo "[install] Plugins: $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
+if [ ${#PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
+    for detail_line in "${PLUGIN_DETAIL_LINES[@]}"; do
+        echo "[install] $detail_line"
+    done
+fi
+if [ "$PLUGIN_WARNINGS" -gt 0 ]; then
+    echo "[install] Plugin warnings: $PLUGIN_WARNINGS"
+fi
 echo "[install] MCP: $MCP_COUNT server(s)"
 echo "[install] Infra .env: $INFRA_ENV_STATUS"
 echo "[install] GSD: $GSD_COMMANDS commands + $GSD_AGENTS agents"
 echo "[install] Done."
+
+# Warnings recap (if any)
+if [ ${#PLUGIN_WARNING_MESSAGES[@]} -gt 0 ]; then
+    echo ""
+    echo "[install] --- Warnings Recap ---"
+    for warning in "${PLUGIN_WARNING_MESSAGES[@]}"; do
+        echo "[install] WARNING: $warning"
+    done
+    echo "[install] --- End Warnings ---"
+fi
