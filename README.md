@@ -442,8 +442,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │   ├── data/                   # Persistent bind mounts (gitignored)
 │   └── mcp/mcp.json
 │
-├── gitprojects/                # Your repos go here
-└── review/                     # Reviews and specs
+└── gitprojects/                # Your repos go here
 ```
 
 ---
