@@ -4,7 +4,7 @@
 
 **A clone-and-go VS Code devcontainer for agentic coding with Claude Code and Codex CLI.**
 
-**Two files. One container. Zero yak shaving.**
+**Clone. Open. Code.**
 
 [![GitHub stars](https://img.shields.io/github/stars/agomusio/no-more-configs?style=for-the-badge&logo=github&color=181717)](https://github.com/agomusio/no-more-configs)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
