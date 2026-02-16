@@ -68,9 +68,9 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-16
-Stopped at: Merged phases 6+7 into single Phase 6 (Langfuse Migration & Validation)
-Resume file: None (ready for Phase 6 planning)
+Last session: 2026-02-15
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-langfuse-migration-validation/06-CONTEXT.md
 
 ---
 *State updated: 2026-02-16 for milestone v1.2*
