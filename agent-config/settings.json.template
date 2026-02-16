@@ -5,23 +5,5 @@
       "/workspace/gitprojects/"
     ],
     "defaultMode": "bypassPermissions"
-  },
-  "env": {
-    "TRACE_TO_LANGFUSE": "true",
-    "LANGFUSE_HOST": "{{LANGFUSE_HOST}}",
-    "LANGFUSE_PUBLIC_KEY": "{{LANGFUSE_PUBLIC_KEY}}",
-    "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}"
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /home/node/.claude/hooks/langfuse_hook.py"
-          }
-        ]
-      }
-    ]
   }
 }

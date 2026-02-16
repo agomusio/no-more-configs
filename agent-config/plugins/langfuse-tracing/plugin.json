@@ -1,0 +1,19 @@
+{
+  "name": "langfuse-tracing",
+  "version": "1.0.0",
+  "description": "Claude Code conversation tracing to Langfuse",
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 /home/node/.claude/hooks/langfuse_hook.py"
+      }
+    ]
+  },
+  "env": {
+    "TRACE_TO_LANGFUSE": "true",
+    "LANGFUSE_HOST": "{{LANGFUSE_HOST}}",
+    "LANGFUSE_PUBLIC_KEY": "{{LANGFUSE_PUBLIC_KEY}}",
+    "LANGFUSE_SECRET_KEY": "{{LANGFUSE_SECRET_KEY}}"
+  }
+}
