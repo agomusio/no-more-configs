@@ -147,12 +147,12 @@ authenticate Claude/Codex → set git identity → save-secrets → secrets.json
 
 Both CLI agents are pre-configured for container use — no interactive prompts on subsequent starts:
 
-| Setting | Claude Code | Codex CLI |
-|---------|-------------|-----------|
-| **Permissions** | Bypassed (`bypassPermissions` in settings) | Bypassed (`approval_policy = "never"`) |
-| **Model** | Opus 4.6 (high effort) | GPT-5.3-Codex (configurable via `config.json`) |
-| **Credentials** | `~/.claude/.credentials.json` | `~/.codex/auth.json` (file-based, no keyring) |
-| **Onboarding** | Skipped when credentials present | Workspace pre-trusted |
+| Setting         | Claude Code                                | Codex CLI                                      |
+| --------------- | ------------------------------------------ | ---------------------------------------------- |
+| **Permissions** | Bypassed (`bypassPermissions` in settings) | Bypassed (`approval_policy = "never"`)         |
+| **Model**       | Opus 4.6 (high effort)                     | GPT-5.3-Codex (configurable via `config.json`) |
+| **Credentials** | `~/.claude/.credentials.json`              | `~/.codex/auth.json` (file-based, no keyring)  |
+| **Onboarding**  | Skipped when credentials present           | Workspace pre-trusted                          |
 
 ---
 
@@ -226,13 +226,13 @@ The install script validates plugins and provides clear feedback:
 
 ### Included Plugins
 
-| Plugin             | Description                                                         |
-| ------------------ | ------------------------------------------------------------------- |
-| `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars) |
-| `nmc`              | NMC system status command (`/nmc`)                                  |
-| `frontend-design`  | Frontend design skills and patterns                                 |
-| `plugin-dev`       | Plugin development guidance                                         |
-| `ralph-wiggum`     | Ralph Wiggum technique for creative problem solving                 |
+| Plugin             | Description                                                                   |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `nmc`              | NMC system status command (`/nmc`)                                            |
+| `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)           |
+| `plugin-dev`       | Plugin development guidance ([source](https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev)) |
+| `ralph-wiggum`     | Ralph Wiggum technique for iterative, self-referential AI development loops ([source](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum)) |
+| `frontend-design`  | Frontend design skills and patterns ([source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design)) |
 
 ---
 
