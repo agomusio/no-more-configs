@@ -12,7 +12,10 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ### Fixed
 
-- Project-repo plugins (`projects/*/.claude/plugins/*/`) not loading — install script now auto-discovers and registers them in `settings.json` `plugins[]` array
+- Project-repo plugins (`projects/*/.claude/plugins/*/`) not loading — install script now auto-discovers and copies their components (skills, commands, agents, hooks) to runtime locations, same as agent-config plugins
+- Project plugin commands now namespaced into `commands/<plugin-name>/` subdirectories to avoid collisions (e.g. `uproot:build-hook`)
+- Project plugin `hooks.json` (settings format) merged directly into `settings.json` instead of through the agent-config accumulator which wrapped them in an extra layer, causing `Invalid Settings` errors
+- Hooks and env vars now reset before rebuilding on each install run, preventing stale entries from persisting across re-runs
 
 ---
 
