@@ -126,10 +126,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LANG-03 | Phase 6 | Pending |
 | LANG-04 | Phase 6 | Pending |
 | LANG-05 | Phase 6 | Pending |
-| VAL-01 | Phase 7 | Pending |
-| VAL-02 | Phase 7 | Pending |
-| VAL-03 | Phase 7 | Pending |
-| VAL-04 | Phase 7 | Pending |
+| VAL-01 | Phase 6 | Pending |
+| VAL-02 | Phase 6 | Pending |
+| VAL-03 | Phase 6 | Pending |
+| VAL-04 | Phase 6 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 35 total

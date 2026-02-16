@@ -15,13 +15,12 @@ This milestone adds a plugin system that extends the container's configuration-a
 ### Phases
 
 **Phase Numbering:**
-- Integer phases (4, 5, 6, 7): Planned milestone work (continuing from v1 phases 1-3)
+- Integer phases (4, 5, 6): Planned milestone work (continuing from v1 phases 1-3)
 - Decimal phases (4.1, 4.2): Urgent insertions (marked with INSERTED)
 
 - [ ] **Phase 4: Core Plugin System** - Plugin discovery, file copying, hook/env registration with GSD protection
 - [ ] **Phase 5: MCP Integration** - Plugin MCP server registration and persistence fix
-- [ ] **Phase 6: Langfuse Migration** - Migrate Langfuse tracing to plugin system
-- [ ] **Phase 7: Enhanced Validation** - Warnings, conflict detection, installation summaries
+- [ ] **Phase 6: Langfuse Migration & Validation** - Migrate Langfuse to plugin, add validation warnings and install summaries
 
 ### Phase Details
 
@@ -57,45 +56,34 @@ Plans:
 Plans:
 - [ ] 05-01-PLAN.md — Plugin MCP accumulation, secret hydration, unified .mcp.json generation, mcp-setup preservation
 
-#### Phase 6: Langfuse Migration
-**Goal**: Langfuse tracing runs as a plugin instead of hardcoded in settings template
-**Depends on**: Phase 4
-**Requirements**: LANG-01, LANG-02, LANG-03, LANG-04, LANG-05
+#### Phase 6: Langfuse Migration & Validation
+**Goal**: Langfuse tracing runs as a plugin instead of hardcoded in settings template, and install script provides clear warnings and summaries for debugging plugin issues
+**Depends on**: Phase 4, Phase 5
+**Requirements**: LANG-01, LANG-02, LANG-03, LANG-04, LANG-05, VAL-01, VAL-02, VAL-03, VAL-04
 **Success Criteria** (what must be TRUE):
   1. Langfuse hook exists in `agent-config/plugins/langfuse-tracing/` with plugin.json manifest
   2. Langfuse hook registration is removed from settings.json.template
   3. Langfuse tracing fires on Stop event identically to pre-migration behavior
   4. User can disable Langfuse via config.json plugins section without manual file edits
+  5. Install script warns when plugin hook references non-existent script file
+  6. Install script warns when plugin file would overwrite another plugin's file
+  7. Install summary displays plugin count, command count, and any warnings encountered
+  8. Invalid plugin.json produces clear error with plugin name and JSON parse failure reason
 **Plans**: TBD
 
 Plans:
 - [ ] 06-01: TBD
 
-#### Phase 7: Enhanced Validation
-**Goal**: Install script provides clear warnings and summaries for debugging plugin issues
-**Depends on**: Phase 4
-**Requirements**: VAL-01, VAL-02, VAL-03, VAL-04
-**Success Criteria** (what must be TRUE):
-  1. Install script warns when plugin hook references non-existent script file
-  2. Install script warns when plugin file would overwrite another plugin's file
-  3. Install summary displays plugin count, command count, and any warnings encountered
-  4. Invalid plugin.json produces clear error with plugin name and JSON parse failure reason
-**Plans**: TBD
-
-Plans:
-- [ ] 07-01: TBD
-
 ### Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5 → 6 → 7
+Phases execute in numeric order: 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. Core Plugin System | 0/3 | Planned | - |
-| 5. MCP Integration | 0/? | Not started | - |
-| 6. Langfuse Migration | 0/? | Not started | - |
-| 7. Enhanced Validation | 0/? | Not started | - |
+| 4. Core Plugin System | 3/3 | Complete | 2026-02-15 |
+| 5. MCP Integration | 1/1 | Complete | 2026-02-16 |
+| 6. Langfuse Migration & Validation | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-02-15 for milestone v1.2*
