@@ -6,6 +6,8 @@
 
 **Clone. Open. Code.**
 
+**Free, transparent, and fully customizable. No subscription walls, no black-box abstractions — just a devcontainer you own and control. For developers who'd rather read the source than trust the vendor.**
+
 [![GitHub stars](https://img.shields.io/github/stars/agomusio/no-more-configs?style=for-the-badge&logo=github&color=181717)](https://github.com/agomusio/no-more-configs)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=for-the-badge)](https://github.com/agomusio/no-more-configs/releases/tag/v1.0.0)
