@@ -69,10 +69,11 @@ Plans:
   6. Install script warns when plugin file would overwrite another plugin's file
   7. Install summary displays plugin count, command count, and any warnings encountered
   8. Invalid plugin.json produces clear error with plugin name and JSON parse failure reason
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01-PLAN.md — Langfuse plugin migration (create plugin, remove hardcoded entries, env hydration)
+- [ ] 06-02-PLAN.md — Enhanced validation and install summary (hook validation, overwrite detection, warnings recap)
 
 ### Progress
 
@@ -83,7 +84,7 @@ Phases execute in numeric order: 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 4. Core Plugin System | 3/3 | Complete | 2026-02-15 |
 | 5. MCP Integration | 1/1 | Complete | 2026-02-16 |
-| 6. Langfuse Migration & Validation | 0/? | Not started | - |
+| 6. Langfuse Migration & Validation | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-15 for milestone v1.2*
