@@ -52,10 +52,10 @@ Plans:
   2. Placeholder tokens like `{{LANGFUSE_SECRET_KEY}}` in plugin MCP configs are hydrated from secrets.json
   3. Plugin MCP servers persist when mcp-setup runs in postStartCommand (no double-write overwrite)
   4. Missing secret tokens produce warnings without crashing install script
-**Plans**: TBD
+**Plans**: 1 plan in 1 wave
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01-PLAN.md — Plugin MCP accumulation, secret hydration, unified .mcp.json generation, mcp-setup preservation
 
 #### Phase 6: Langfuse Migration
 **Goal**: Langfuse tracing runs as a plugin instead of hardcoded in settings template
