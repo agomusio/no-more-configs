@@ -3,7 +3,7 @@ name: gitprojects
 description: Project directory mapping for repositories in the sandbox. Use when the user mentions a project by name, references gitprojects, asks about repos in the sandbox, or wants to work on a specific project.
 license: MIT
 metadata:
-  author: Sam Boland
+  author: agomusio
   version: "2.0.0"
 ---
 
