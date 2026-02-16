@@ -40,6 +40,7 @@ PLUGIN_INSTALLED=0
 PLUGIN_SKIPPED=0
 PLUGIN_HOOKS='{}'
 PLUGIN_ENV='{}'
+PLUGIN_MCP='{}'
 PLUGIN_WARNINGS=0
 
 # Load config.json (or use defaults)
@@ -431,6 +432,19 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
             fi
         fi
 
+        # Accumulate MCP servers with source tagging
+        MANIFEST_MCP=$(jq -r '.mcp_servers // {}' "$MANIFEST" 2>/dev/null || echo "{}")
+        if [ "$MANIFEST_MCP" != "{}" ] && [ "$MANIFEST_MCP" != "null" ]; then
+            # Tag each server with _source for traceability
+            TAGGED_MCP=$(echo "$MANIFEST_MCP" | jq --arg plugin "$plugin_name" '
+                to_entries | map(.value._source = "plugin:\($plugin)") | from_entries
+            ' 2>/dev/null || echo "{}")
+            if [ "$TAGGED_MCP" != "{}" ]; then
+                PLUGIN_MCP=$(jq -n --argjson acc "$PLUGIN_MCP" --argjson new "$TAGGED_MCP" \
+                    '$acc * $new' 2>/dev/null || echo "$PLUGIN_MCP")
+            fi
+        fi
+
         # Per-plugin detail logging
         detail_parts=()
         [ "${plugin_skills:-0}" -gt 0 ] && detail_parts+=("${plugin_skills} skill(s)")
@@ -441,6 +455,10 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
         # Count env vars from this plugin's manifest
         plugin_env_count=$(jq -r '.env // {} | length' "$MANIFEST" 2>/dev/null || echo "0")
         [ "$plugin_env_count" -gt 0 ] && detail_parts+=("${plugin_env_count} env var(s)")
+
+        # Count MCP servers from this plugin's manifest
+        plugin_mcp_count=$(echo "$MANIFEST_MCP" | jq 'if . == {} or . == null then 0 else length end' 2>/dev/null || echo "0")
+        [ "$plugin_mcp_count" -gt 0 ] && detail_parts+=("${plugin_mcp_count} MCP server(s)")
 
         detail_str=$(IFS=", "; echo "${detail_parts[*]}")
         if [ -n "$detail_str" ]; then
@@ -476,6 +494,13 @@ if [ "$PLUGIN_INSTALLED" -gt 0 ] || [ "$PLUGIN_SKIPPED" -gt 0 ]; then
         TOTAL_PLUGIN_ENV=$(echo "$PLUGIN_ENV" | jq 'length' 2>/dev/null || echo "0")
     fi
     echo "[install] Plugin env vars: $TOTAL_PLUGIN_ENV"
+
+    # Count total plugin MCP servers
+    TOTAL_PLUGIN_MCP=0
+    if [ "$PLUGIN_MCP" != "{}" ]; then
+        TOTAL_PLUGIN_MCP=$(echo "$PLUGIN_MCP" | jq 'length' 2>/dev/null || echo "0")
+    fi
+    echo "[install] Plugin MCP servers: $TOTAL_PLUGIN_MCP"
 
     if [ "$PLUGIN_WARNINGS" -gt 0 ]; then
         echo "[install] Warnings: $PLUGIN_WARNINGS"
@@ -544,19 +569,75 @@ if [ -f "$SECRETS_FILE" ]; then
     fi
 fi
 
-# Generate .mcp.json from enabled MCP templates
+# Hydrate {{TOKEN}} placeholders in plugin MCP configs from secrets.json
+hydrate_plugin_mcp() {
+    local plugin_mcp="$1"
+    local secrets_file="$2"
+    local hydrated="$plugin_mcp"
+
+    # Iterate over each server to hydrate per-plugin secrets
+    local servers
+    servers=$(echo "$plugin_mcp" | jq -r 'keys[]' 2>/dev/null || true)
+
+    for server in $servers; do
+        # Get plugin name from _source tag
+        local p_name
+        p_name=$(echo "$plugin_mcp" | jq -r --arg s "$server" '.[$s]._source // "" | sub("^plugin:"; "")' 2>/dev/null || echo "")
+        [ -z "$p_name" ] && continue
+
+        # Extract {{TOKEN}} patterns from this server's config
+        local server_json
+        server_json=$(echo "$plugin_mcp" | jq --arg s "$server" '.[$s]' 2>/dev/null || echo "{}")
+        local server_tokens
+        server_tokens=$(echo "$server_json" | grep -oP '\{\{[A-Z_]+\}\}' | sort -u || true)
+
+        for token_pattern in $server_tokens; do
+            local token_name
+            token_name=$(echo "$token_pattern" | sed 's/{{//;s/}}//')
+
+            # Namespaced lookup: secrets.json["plugin-name"]["TOKEN_NAME"]
+            local secret_value=""
+            if [ -f "$secrets_file" ]; then
+                secret_value=$(jq -r --arg p "$p_name" --arg k "$token_name" \
+                    '.[$p][$k] // ""' "$secrets_file" 2>/dev/null || echo "")
+            fi
+
+            # Warn if missing (per user decision: inline warning, no crash)
+            if [ -z "$secret_value" ]; then
+                echo "⚠ $p_name: missing $token_name"
+            fi
+
+            # Hydrate using jq walk+gsub (safe for special characters in secrets)
+            hydrated=$(echo "$hydrated" | jq \
+                --arg token "$token_pattern" \
+                --arg value "$secret_value" \
+                'walk(if type == "string" then gsub($token; $value) else . end)' 2>/dev/null || echo "$hydrated")
+        done
+    done
+
+    echo "$hydrated"
+}
+
+# Generate .mcp.json — unified: plugin servers (hydrated) + base template servers
+MCP_JSON='{"mcpServers":{}}'
+
+# Step 1: Add hydrated plugin MCP servers
+if [ "$PLUGIN_MCP" != "{}" ]; then
+    HYDRATED_PLUGIN_MCP=$(hydrate_plugin_mcp "$PLUGIN_MCP" "$SECRETS_FILE")
+    MCP_JSON=$(echo "$MCP_JSON" | jq --argjson plugin "$HYDRATED_PLUGIN_MCP" \
+        '.mcpServers = $plugin')
+    PLUGIN_MCP_COUNT=$(echo "$HYDRATED_PLUGIN_MCP" | jq 'length' 2>/dev/null || echo "0")
+    MCP_COUNT=$((MCP_COUNT + PLUGIN_MCP_COUNT))
+fi
+
+# Step 2: Add base template servers from config.json
 if [ -f "$CONFIG_FILE" ]; then
-    # Get list of enabled MCP servers
     ENABLED_SERVERS=$(jq -r '.mcp_servers | to_entries[] | select(.value.enabled == true) | .key' "$CONFIG_FILE" 2>/dev/null || echo "")
 
     if [ -n "$ENABLED_SERVERS" ]; then
-        # Build combined MCP config
-        MCP_JSON='{"mcpServers":{}}'
-
         for SERVER in $ENABLED_SERVERS; do
             TEMPLATE_FILE="$MCP_TEMPLATES_DIR/${SERVER}.json"
             if [ -f "$TEMPLATE_FILE" ]; then
-                # Hydrate template and merge into combined config
                 HYDRATED=$(sed "s|{{MCP_GATEWAY_URL}}|$MCP_GATEWAY_URL|g" "$TEMPLATE_FILE")
                 MCP_JSON=$(echo "$MCP_JSON" | jq --argjson server "{\"$SERVER\": $HYDRATED}" '.mcpServers += $server')
                 MCP_COUNT=$((MCP_COUNT + 1))
@@ -564,21 +645,18 @@ if [ -f "$CONFIG_FILE" ]; then
                 echo "[install] WARNING: Template $TEMPLATE_FILE not found for enabled server $SERVER"
             fi
         done
-
-        echo "$MCP_JSON" > "$CLAUDE_DIR/.mcp.json"
-        echo "[install] Generated .mcp.json with $MCP_COUNT server(s)"
-    else
-        # No enabled servers, create default with mcp-gateway
-        echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$CLAUDE_DIR/.mcp.json"
-        MCP_COUNT=1
-        echo "[install] Generated .mcp.json with 1 server(s) (default)"
     fi
-else
-    # No config.json, create default with mcp-gateway
-    echo '{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}' > "$CLAUDE_DIR/.mcp.json"
-    MCP_COUNT=1
-    echo "[install] Generated .mcp.json with 1 server(s) (default)"
 fi
+
+# Fallback: if no servers at all, add default mcp-gateway
+SERVER_COUNT=$(echo "$MCP_JSON" | jq '.mcpServers | length')
+if [ "$SERVER_COUNT" -eq 0 ]; then
+    MCP_JSON='{"mcpServers":{"mcp-gateway":{"type":"sse","url":"'"$MCP_GATEWAY_URL"'/sse"}}}'
+    MCP_COUNT=1
+fi
+
+echo "$MCP_JSON" > "$CLAUDE_DIR/.mcp.json"
+echo "[install] Generated .mcp.json with $MCP_COUNT server(s)"
 
 # Generate infra/.env from secrets.json if infra section exists
 INFRA_ENV_STATUS="skipped — no infra secrets"
