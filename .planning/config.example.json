@@ -24,5 +24,10 @@
     "codex": {
       "enabled": false
     }
+  },
+  "plugins": {
+    "langfuse-tracing": {
+      "enabled": true
+    }
   }
 }
