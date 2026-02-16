@@ -2,7 +2,7 @@
 
 # NO MORE CONFIGS
 
-**A clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models.**
+**A clone-and-go VS Code devcontainer for agentic coding with Claude Code and Codex CLI.**
 
 **Two files. One container. Zero yak shaving.**
 
