@@ -557,7 +557,7 @@ Handled automatically. If it recurs: `git config --global --add safe.directory '
 
 Built on the shoulders of:
 
-**[Claude Code Dev Container](https://github.com/anthropics/claude-code)** · **[claude-code-langfuse-template](https://github.com/doneyli/claude-code-langfuse-template)** · **[Get Shit Done](https://github.com/glittercowboy/get-shit-done)** · **[codex-mcp-server](https://github.com/tuannvm/codex-mcp-server)**
+**[Claude Code](https://github.com/anthropics/claude-code)** (devcontainer, plugins, hooks framework) · **[claude-code-langfuse-template](https://github.com/doneyli/claude-code-langfuse-template)** · **[Get Shit Done](https://github.com/glittercowboy/get-shit-done)** · **[codex-mcp-server](https://github.com/tuannvm/codex-mcp-server)**
 
 <br>
 
