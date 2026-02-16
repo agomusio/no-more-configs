@@ -1,4 +1,4 @@
-# No More Configs
+# No More Configs v1.0.0
 
 No More Configs (NMC) is a clone-and-go VS Code devcontainer for agentic coding with Claude Code, Codex CLI, and other models. Langfuse observability, MCP gateway, plugin system, GSD workflow framework, iptables firewall — all configured from two files at the repo root. No host dependencies, no scattered config, no yak shaving.
 
