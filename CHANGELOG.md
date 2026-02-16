@@ -6,6 +6,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versio
 
 ---
 
+## [1.0.1] - Unreleased
+
+### Changed
+
+- `config.json` no longer ships in repo — created at runtime by `save-config` and `save-secrets`; example files serve as reference
+- README fully redesigned — centered header, shields.io badges, feature matrix, value proposition
+- Copyright year corrected to 2026
+- Platform support clarified — tested on Windows (WSL2), macOS/Linux untested
+- Acknowledgments expanded — Claude Code credited for plugins and hooks framework, not just devcontainer
+- GSD framework description clarified
+
+### Removed
+
+- `review/` directory (internal-only, not useful for end users)
+- Personal author name replaced with `agomusio` in plugin and skill metadata
+
+### Added
+
+- `CHANGELOG.md`
+
+---
+
 ## [1.0.0] - 2026-02-16
 
 First public release. Everything below is what ships out of the box.
@@ -50,4 +72,5 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
+[1.0.1]: https://github.com/agomusio/no-more-configs/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/agomusio/no-more-configs/releases/tag/v1.0.0
