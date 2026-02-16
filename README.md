@@ -226,13 +226,13 @@ The install script validates plugins and provides clear feedback:
 
 ### Included Plugins
 
-| Plugin             | Description                                                                   |
-| ------------------ | ----------------------------------------------------------------------------- |
-| `nmc`              | NMC system status command (`/nmc`)                                            |
-| `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)           |
-| `plugin-dev`       | Plugin development guidance ([source](https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev)) |
+| Plugin             | Description                                                                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nmc`              | NMC system status command (`/nmc`)                                                                                                                               |
+| `langfuse-tracing` | Claude Code conversation tracing to Langfuse (Stop hook + env vars)                                                                                              |
+| `plugin-dev`       | Plugin development guidance ([source](https://github.com/anthropics/claude-code/tree/main/plugins/plugin-dev))                                                   |
 | `ralph-wiggum`     | Ralph Wiggum technique for iterative, self-referential AI development loops ([source](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum)) |
-| `frontend-design`  | Frontend design skills and patterns ([source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design)) |
+| `frontend-design`  | Frontend design skills and patterns ([source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design))                                      |
 
 ---
 
