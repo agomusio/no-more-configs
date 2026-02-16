@@ -29,8 +29,8 @@ cd no-more-configs && code .</pre>
 
 </div>
 
-```
-You                         Container
+<div align="center">
+<pre>You                         Container
  │                           ├── Claude Code CLI + Codex CLI
  ├── config.json ──────────► ├── Firewall domains
  │   (settings)              ├── VS Code settings
@@ -40,8 +40,8 @@ You                         Container
  │                           ├── Plugin env vars (hydrated)
  ├── agent-config/plugins/ ► └── Hooks, commands, agents, skills, MCP
  │   (self-registering)
- └── Open in Container ────► Done.
-```
+ └── Open in Container ────► Done.</pre>
+</div>
 
 ---
 
