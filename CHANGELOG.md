@@ -8,7 +8,7 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
-## [1.0.3] - 2026-02-16
+## [1.0.3] - 2026-02-16 `released`
 
 ### Fixed
 
