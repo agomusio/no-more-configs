@@ -8,6 +8,26 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
+## [1.1.1] - 2026-02-17
+
+### Changed
+
+- **`save-config` rewrite** — now writes all config sections (firewall, codex, infra, langfuse, vscode, mcp_servers, plugins) with sensible defaults, not just claude_code preferences. Auto-discovers installed plugins. Existing non-default values are preserved.
+- README: npx installer commands updated to `@latest` throughout
+- README: added §3 "Clone Your Projects" with `config.json → vscode.git_scan_paths` instructions
+- README: added "Adding Git Repos" to Customization section
+- README: project structure tree annotation improved
+
+### Fixed
+
+- **Update notification showing backwards versions** — `nmc-update` OMZ plugin now checks commit direction (`rev-list HEAD..origin/main --count`) instead of just HEAD mismatch, so it only notifies when origin is ahead of local
+
+### Housekeeping
+
+- `.gitignore`: sandbox-only paths added (`.planning/`, `review/`, `TODO.md`, `CHANGELOG.md`, `agent-config/plugins/nmcs/`, `agent-config/skills/projects/SKILL.md`) so they don't appear as untracked in NMC clones
+
+---
+
 ## [1.1.0] - 2026-02-16 `released`
 
 ### Added
@@ -130,7 +150,8 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.1.0]: https://github.com/agomusio/no-more-configs/compare/v1.0.3...HEAD
+[1.1.1]: https://github.com/agomusio/no-more-configs/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/agomusio/no-more-configs/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/agomusio/no-more-configs/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/agomusio/no-more-configs/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/agomusio/no-more-configs/compare/v1.0.0...v1.0.1
