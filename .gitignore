@@ -35,5 +35,12 @@ secrets.json
 agent-config/plugins/plugin-dev/
 agent-config/plugins/frontend-design/
 
+# Sandbox-only (private fork content — not part of the public NMC repo)
+agent-config/plugins/nmcs/
+.planning/
+review/
+TODO.md
+CHANGELOG.md
+
 # Host-side Claude Code artifacts (not part of container config)
 .claude/
