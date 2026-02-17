@@ -1,0 +1,36 @@
+{
+  "name": "no-more-configs",
+  "version": "1.0.3",
+  "description": "One-command installer for No More Configs — a clone-and-go VS Code devcontainer for Claude Code",
+  "type": "module",
+  "bin": {
+    "no-more-configs": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "devcontainer",
+    "vscode",
+    "codex",
+    "ai",
+    "coding-assistant"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agomusio/no-more-configs.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/agomusio/no-more-configs",
+  "bugs": {
+    "url": "https://github.com/agomusio/no-more-configs/issues"
+  },
+  "author": "agomusio",
+  "license": "MIT"
+}
