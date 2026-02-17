@@ -2,6 +2,25 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Check if firewall is disabled via config.json
+CONFIG_FILE="/workspace/config.json"
+if [ -f "$CONFIG_FILE" ]; then
+    FIREWALL_ENABLED=$(jq -r '.firewall.enabled // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
+    if [ "$FIREWALL_ENABLED" = "false" ]; then
+        echo ">>> Firewall disabled (config.json → firewall.enabled = false)"
+        # Ensure all policies are ACCEPT (clean slate)
+        iptables -P INPUT ACCEPT 2>/dev/null || true
+        iptables -P FORWARD ACCEPT 2>/dev/null || true
+        iptables -P OUTPUT ACCEPT 2>/dev/null || true
+        iptables -F 2>/dev/null || true
+        ip6tables -P INPUT ACCEPT 2>/dev/null || true
+        ip6tables -P FORWARD ACCEPT 2>/dev/null || true
+        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
+        ip6tables -F 2>/dev/null || true
+        exit 0
+    fi
+fi
+
 echo ">>> Starting Firewall Configuration..."
 
 # --- 1. PRE-FLIGHT CHECKS & VARIABLES ---

@@ -85,13 +85,15 @@ CORE_DOMAINS=(
     "sentry.io"
     "statsig.anthropic.com"
     "statsig.com"
-    # VS Code marketplace
+    # VS Code marketplace + extension CDN
     "marketplace.visualstudio.com"
     "gallerycdn.vsassets.io"
     "gallery.vsassets.io"
     "vsassets.io"
     "vscode.blob.core.windows.net"
     "update.code.visualstudio.com"
+    # Azure Blob Storage (VS Code extensions, telemetry, results)
+    "productionresultssa1.blob.core.windows.net"
     # Debian repositories
     "deb.debian.org"
     "security.debian.org"
