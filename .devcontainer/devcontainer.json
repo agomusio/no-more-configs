@@ -21,7 +21,8 @@
         "esbenp.prettier-vscode",
         "cloudflare.cloudflare-workers-bindings-extension",
         "qwtel.sqlite-viewer",
-        "bradlc.vscode-tailwindcss"
+        "bradlc.vscode-tailwindcss",
+        "github.vscode-github-actions"
       ],
       "settings": {
         "editor.formatOnSave": true,

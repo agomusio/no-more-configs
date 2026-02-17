@@ -8,7 +8,20 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
-## [1.1.1] - 2026-02-17
+## [1.1.2] - 2026-02-17
+
+### Added
+
+- **Automated npm publishing** — GitHub Actions workflow publishes to npm with provenance via OIDC trusted publishing (no token required). First release published via CI
+- GitHub Actions VS Code extension (`github.vscode-github-actions`) added to devcontainer
+
+### Changed
+
+- v1.1.1 marked as released
+
+---
+
+## [1.1.1] - 2026-02-17 `released`
 
 ### Changed
 
@@ -150,7 +163,8 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.1.1]: https://github.com/agomusio/no-more-configs/compare/v1.1.0...HEAD
+[1.1.2]: https://github.com/agomusio/no-more-configs/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/agomusio/no-more-configs/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/agomusio/no-more-configs/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/agomusio/no-more-configs/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/agomusio/no-more-configs/compare/v1.0.1...v1.0.2
