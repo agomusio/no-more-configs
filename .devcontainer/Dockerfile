@@ -164,6 +164,19 @@ RUN sudo cp /tmp/langfuse-setup.sh /usr/local/bin/langfuse-setup && \
     sudo chmod +x /usr/local/bin/langfuse-setup && \
     rm /tmp/langfuse-setup.sh
 
+# Install nmc-update helper (in-container updater)
+COPY --chown=node:node nmc-update.sh /tmp/nmc-update.sh
+RUN sudo cp /tmp/nmc-update.sh /usr/local/bin/nmc-update && \
+    sudo chmod +x /usr/local/bin/nmc-update && \
+    rm /tmp/nmc-update.sh
+
+# Install nmc-update OMZ plugin (update notification on shell open)
+COPY --chown=node:node nmc-update.plugin.zsh /tmp/nmc-update.plugin.zsh
+RUN mkdir -p /home/node/.oh-my-zsh/custom/plugins/nmc-update && \
+    cp /tmp/nmc-update.plugin.zsh /home/node/.oh-my-zsh/custom/plugins/nmc-update/nmc-update.plugin.zsh && \
+    rm /tmp/nmc-update.plugin.zsh && \
+    sed -i 's/plugins=(git fzf /plugins=(git fzf nmc-update /' /home/node/.zshrc
+
 # Shell aliases
 RUN echo "alias clauder='claude --resume'" >> /home/node/.bashrc && \
     echo "alias clauder='claude --resume'" >> /home/node/.zshrc && \

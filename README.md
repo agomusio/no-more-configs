@@ -11,11 +11,11 @@
 [![GitHub stars](https://img.shields.io/github/stars/agomusio/no-more-configs?style=for-the-badge&logo=github&color=181717)](https://github.com/agomusio/no-more-configs)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/agomusio/no-more-configs?style=for-the-badge&color=brightgreen)](https://github.com/agomusio/no-more-configs/releases/latest)
+[![npm](https://img.shields.io/npm/v/no-more-configs?style=for-the-badge&logo=npm&color=CB3837)](https://www.npmjs.com/package/no-more-configs)
 
 <br>
 
-<pre>git clone https://github.com/agomusio/no-more-configs.git
-cd no-more-configs && code .</pre>
+<pre>npx no-more-configs</pre>
 
 **Tested on Windows (WSL2). macOS and Linux should work but are untested.**
 
@@ -59,7 +59,7 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 | **Codex CLI**              | OpenAI's agentic coding CLI — GPT-5.3-Codex, full-auto mode. Optional, requires separate ChatGPT Plus/Pro subscription.        | Out of the box |
 | **Plugin system**          | Drop a directory with a `plugin.json` to register hooks, env vars, commands, agents, MCP servers                               | Out of the box |
 | **GSD framework**          | 30+ slash commands and 11 specialized agents for structured development                                                        | Out of the box |
-| **iptables firewall**      | Default-deny network with domain whitelist (31 core domains)                                                                   | Out of the box |
+| **iptables firewall**      | Default-deny network with domain whitelist (32 core domains), disable via `config.json`                                        | Out of the box |
 | **Oh-My-Zsh**              | Powerlevel10k, fzf, git-delta, GitHub CLI                                                                                      | Out of the box |
 | **Langfuse observability** | Self-hosted tracing — every conversation traced to a local dashboard                                                           | Opt-in         |
 | **MCP gateway**            | Model Context Protocol tool access via Docker MCP Gateway                                                                      | Opt-in         |
@@ -76,6 +76,12 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 - [Git](https://git-scm.com/)
 
 ### 1. Clone and Open
+
+```bash
+npx no-more-configs
+```
+
+Or clone manually:
 
 ```bash
 git clone https://github.com/agomusio/no-more-configs.git
@@ -136,6 +142,22 @@ codexr                         # Resume a recent Codex session
 ```
 
 Your projects go in `projects/`. Clone repos there and they'll be auto-detected by VS Code's git scanner.
+
+### 5. Updating
+
+**From the host** (outside the container):
+
+```bash
+npx no-more-configs
+```
+
+**From inside the container:**
+
+```bash
+nmc-update
+```
+
+Both pull the latest changes and tell you if a container rebuild is needed. The container shell also shows a notification banner when a new version is available.
 
 ---
 
@@ -322,7 +344,15 @@ The dev container and sidecar services are sibling containers on the same Docker
 
 Default policy is **DROP**. Only whitelisted domains are reachable.
 
-**Always included** (31 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, OpenAI (API + Auth + Platform + ChatGPT), Google AI API, Cloudflare, and more.
+To disable the firewall entirely, set `firewall.enabled` to `false` in `config.json`:
+
+```json
+{ "firewall": { "enabled": false } }
+```
+
+Rebuild the container to apply. When disabled, all iptables rules are flushed and policies set to ACCEPT.
+
+**Always included** (32 core domains): Anthropic API, GitHub, npm, PyPI, Debian repos, VS Code Marketplace, Azure Blob Storage (VS Code extensions), OpenAI (API + Auth + Platform + ChatGPT), Google AI API, Cloudflare, and more.
 
 **Auto-generated**: Per-publisher VS Code extension CDN domains are derived from `devcontainer.json` so extensions install without firewall errors.
 
@@ -416,6 +446,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 | `codexr`         | Alias for `codex resume`                                                |
 | `save-secrets`   | Capture live credentials, git identity, and keys to `secrets.json`      |
 | `langfuse-setup` | Generate secrets, start Langfuse stack, verify health                   |
+| `nmc-update`     | Pull latest NMC changes, detect if container rebuild is needed          |
 | `mcp-setup`      | Regenerate MCP configs (Claude + Codex) and health-check gateway        |
 | `slc`            | Show postCreate lifecycle log (`/tmp/devcontainer-logs/postCreate.log`) |
 | `sls`            | Show postStart lifecycle log (`/tmp/devcontainer-logs/postStart.log`)   |
