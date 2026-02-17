@@ -422,6 +422,7 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
                 PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
                 PLUGIN_WARNING_MESSAGES+=("Plugin '$plugin_name': GSD-protected commands/gsd/ directory")
             fi
+            # Copy flat command files
             for cmd_file in "$plugin_dir/commands"/*.md; do
                 [ -f "$cmd_file" ] || continue
                 cmd_basename=$(basename "$cmd_file")
@@ -434,7 +435,15 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
                     cp "$cmd_file" "$CLAUDE_DIR/commands/"
                 fi
             done
-            plugin_cmds=$(find "$plugin_dir/commands" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+            # Copy namespaced command subdirectories (commands/<namespace>/*.md → <namespace>:cmd)
+            for cmd_subdir in "$plugin_dir/commands"/*/; do
+                [ -d "$cmd_subdir" ] || continue
+                subdir_name=$(basename "$cmd_subdir")
+                [ "$subdir_name" = "gsd" ] && continue  # GSD-protected
+                mkdir -p "$CLAUDE_DIR/commands/$subdir_name"
+                cp "$cmd_subdir"*.md "$CLAUDE_DIR/commands/$subdir_name/" 2>/dev/null || true
+            done
+            plugin_cmds=$(find "$plugin_dir/commands" -name "*.md" -type f 2>/dev/null | wc -l)
         fi
 
         # Copy agents (with GSD protection and overwrite detection)

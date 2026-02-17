@@ -10,6 +10,11 @@
       "name": "nmc",
       "file": "commands/nmc.md",
       "description": "Show NMC system status — plugins, hooks, MCP servers, env vars, container info"
+    },
+    {
+      "name": "hi",
+      "file": "commands/hi.md",
+      "description": "Orient yourself in this workspace — read README, discover projects, check environment"
     }
   ],
   "agents": [
