@@ -12,12 +12,8 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ### Added
 
-- **Automated npm publishing** — GitHub Actions workflow publishes to npm with provenance via OIDC trusted publishing (no token required). First release published via CI
-- GitHub Actions VS Code extension (`github.vscode-github-actions`) added to devcontainer
-
-### Changed
-
-- v1.1.1 marked as released
+- GitHub Actions VS Code extension added to devcontainer
+- Automated npm publishing via GitHub Actions with OIDC trusted publishing and provenance
 
 ---
 
@@ -25,19 +21,13 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ### Changed
 
-- **`save-config` rewrite** — now writes all config sections (firewall, codex, infra, langfuse, vscode, mcp_servers, plugins) with sensible defaults, not just claude_code preferences. Auto-discovers installed plugins. Existing non-default values are preserved.
+- **`save-config` rewrite** — now writes all config sections (firewall, codex, infra, langfuse, vscode, mcp_servers, plugins) with sensible defaults, not just `claude_code` preferences. Auto-discovers installed plugins. Existing non-default values are preserved
+- README: added §3 "Clone Your Projects" with project setup instructions
 - README: npx installer commands updated to `@latest` throughout
-- README: added §3 "Clone Your Projects" with `config.json → vscode.git_scan_paths` instructions
-- README: added "Adding Git Repos" to Customization section
-- README: project structure tree annotation improved
 
 ### Fixed
 
-- **Update notification showing backwards versions** — `nmc-update` OMZ plugin now checks commit direction (`rev-list HEAD..origin/main --count`) instead of just HEAD mismatch, so it only notifies when origin is ahead of local
-
-### Housekeeping
-
-- `.gitignore`: sandbox-only paths added (`.planning/`, `review/`, `TODO.md`, `CHANGELOG.md`, `agent-config/plugins/nmcs/`, `agent-config/skills/projects/SKILL.md`) so they don't appear as untracked in NMC clones
+- **Update notification showing backwards versions** — `nmc-update` plugin now only notifies when origin is ahead of local
 
 ---
 
