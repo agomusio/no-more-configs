@@ -68,7 +68,11 @@ _nmc_bg_check() {
         local_head=$(git -C "$workspace" rev-parse HEAD 2>/dev/null) || return
         remote_head=$(git -C "$workspace" rev-parse origin/main 2>/dev/null) || return
 
-        if [[ "$local_head" != "$remote_head" ]]; then
+        # Only notify when origin is ahead of local (not when local is ahead)
+        local behind
+        behind=$(git -C "$workspace" rev-list HEAD..origin/main --count 2>/dev/null) || return
+
+        if [[ "$behind" -gt 0 ]]; then
             # Read the remote version from CHANGELOG.md
             local remote_version=""
             remote_version=$(git -C "$workspace" show origin/main:CHANGELOG.md 2>/dev/null \

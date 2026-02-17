@@ -4,7 +4,7 @@
 
 **A clone-and-go VS Code devcontainer built for Claude Code. Codex CLI included as an optional second agent.**
 
-**Clone. Open. Code.**
+**Install. Open. Code.**
 
 **Free, transparent, and fully customizable. No subscription walls, no black-box abstractions — just a devcontainer you own and control. For developers who'd rather read the source than trust the vendor.**
 
@@ -71,11 +71,12 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 
 ### Prerequisites
 
+- [Node.js](https://nodejs.org/) >= 18 (for npx)
 - [VS Code](https://code.visualstudio.com/) with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
 - [Git](https://git-scm.com/)
 
-### 1. Clone and Open
+### 1. Install and Open
 
 ```bash
 npx no-more-configs@latest
@@ -88,6 +89,10 @@ git clone https://github.com/agomusio/no-more-configs.git
 cd no-more-configs
 code .
 ```
+
+This clones the repo, prints next steps, and tries to open VS Code automatically. You can also specify a directory: `npx no-more-configs my-workspace`.
+
+> **Alternative:** `git clone https://github.com/agomusio/no-more-configs.git && cd no-more-configs && code .`
 
 VS Code will detect the devcontainer and prompt to reopen in container. Click **Reopen in Container** (or use `Ctrl+Shift+P` → `Dev Containers: Reopen in Container`).
 
@@ -120,7 +125,24 @@ Then capture everything so it survives container rebuilds:
 save-secrets
 ```
 
-### 3. Start the Langfuse Stack (Optional)
+### 3. Clone Your Projects
+
+Your repos live in `projects/` — clone them there and register them in `config.json` so VS Code's git scanner picks them up:
+
+```bash
+cd /workspace/projects
+git clone https://github.com/you/your-repo.git
+```
+
+Then add the path to `config.json → vscode.git_scan_paths`:
+
+```json
+{ "vscode": { "git_scan_paths": ["projects/your-repo"] } }
+```
+
+Each project can have its own `CLAUDE.md` for project-specific agent instructions, and `.claude/plugins/` for project-scoped plugins that are auto-installed alongside the global ones.
+
+### 4. Start the Langfuse Stack (Optional)
 
 If you want conversation tracing:
 
@@ -130,7 +152,7 @@ langfuse-setup
 
 This generates credentials (into `secrets.json`), starts the stack, and verifies health. View traces at `http://localhost:3052`.
 
-### 4. Done
+### 5. Done
 
 Start coding:
 
@@ -158,7 +180,6 @@ nmc-update
 ```
 
 Both pull the latest changes and tell you if a container rebuild is needed. The container shell also shows a notification banner when a new version is available.
-
 ---
 
 ## How It Works
@@ -499,7 +520,7 @@ tail -50 ~/.claude/state/langfuse_hook.log
 │   ├── data/                   # Persistent bind mounts (gitignored)
 │   └── mcp/mcp.json
 │
-└── projects/                # Your repos go here
+└── projects/                   # Your repos go here
 ```
 
 ---
@@ -541,7 +562,6 @@ cd /workspace/projects && git clone <url>
 ```
 
 Add the path to `config.json → vscode.git_scan_paths` for VS Code git integration.
-
 ### Adding MCP Servers
 
 Via templates:
