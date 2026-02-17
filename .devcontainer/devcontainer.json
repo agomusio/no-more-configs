@@ -1,5 +1,5 @@
 {
-  "name": "Claude Code Sandbox",
+  "name": "No More Configs",
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
