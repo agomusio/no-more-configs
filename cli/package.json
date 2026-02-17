@@ -1,10 +1,10 @@
 {
   "name": "no-more-configs",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "One-command installer for No More Configs — a clone-and-go VS Code devcontainer for Claude Code",
   "type": "module",
   "bin": {
-    "no-more-configs": "./index.js"
+    "no-more-configs": "index.js"
   },
   "files": [
     "index.js",

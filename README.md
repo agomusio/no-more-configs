@@ -15,7 +15,7 @@
 
 <br>
 
-<pre>npx no-more-configs</pre>
+<pre>npx no-more-configs@latest</pre>
 
 **Tested on Windows (WSL2). macOS and Linux should work but are untested.**
 
@@ -78,7 +78,7 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 ### 1. Clone and Open
 
 ```bash
-npx no-more-configs
+npx no-more-configs@latest
 ```
 
 Or clone manually:
@@ -148,7 +148,7 @@ Your projects go in `projects/`. Clone repos there and they'll be auto-detected 
 **From the host** (outside the container):
 
 ```bash
-npx no-more-configs
+npx no-more-configs@latest
 ```
 
 **From inside the container:**
@@ -190,10 +190,29 @@ Everything is driven by two files at the repo root:
   "git": { "name": "Your Name", "email": "you@example.com" },
   "claude": { "credentials": { "...auth tokens..." } },
   "codex": { "auth": { "...oauth tokens..." } },
-  "nmc-langfuse-tracing": { "LANGFUSE_HOST": "...", "LANGFUSE_PUBLIC_KEY": "...", "LANGFUSE_SECRET_KEY": "..." },
-  "infra": { "postgres_password": "...", "langfuse_project_secret_key": "...", "..." }
+  "gh": { "oauth_token": "...", "user": "...", "git_protocol": "https" },
+  "npm": { "auth_token": "npm_..." },
+  "infra": {
+    "postgres_password": "...", "encryption_key": "...", "nextauth_secret": "...",
+    "salt": "...", "clickhouse_password": "...", "minio_root_password": "...",
+    "redis_auth": "...", "langfuse_project_public_key": "...",
+    "langfuse_project_secret_key": "...", "langfuse_user_email": "...",
+    "langfuse_user_name": "...", "langfuse_user_password": "...",
+    "langfuse_org_name": "..."
+  },
+  "nmc-langfuse-tracing": { "LANGFUSE_HOST": "...", "LANGFUSE_PUBLIC_KEY": "...", "LANGFUSE_SECRET_KEY": "..." }
 }
 ```
+
+| Key | Source | Captured by |
+| --- | --- | --- |
+| `git` | `git config --global` | `save-secrets` |
+| `claude` | `~/.claude/.credentials.json` | `save-secrets` |
+| `codex` | `~/.codex/auth.json` | `save-secrets` |
+| `gh` | `~/.config/gh/hosts.yml` | `save-secrets` |
+| `npm` | `~/.npmrc` | `save-secrets` |
+| `infra` | `infra/.env` (Langfuse stack) | `langfuse-setup` → `save-secrets` |
+| `nmc-langfuse-tracing` | Derived from `infra` + `config.json` | `save-secrets` |
 
 Plugin secrets use namespaced keys (`secrets.json["plugin-name"]["TOKEN"]`). The `infra` section holds Langfuse stack infrastructure secrets. Run `langfuse-setup` to generate these automatically — `save-secrets` derives the plugin namespace from the infra keys.
 

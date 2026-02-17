@@ -66,6 +66,20 @@ else
     echo "[save-secrets] GitHub CLI credentials: not found (run 'gh auth login' to authenticate)"
 fi
 
+# Capture npm credentials
+NPMRC_FILE="/home/node/.npmrc"
+if [ -f "$NPMRC_FILE" ]; then
+    NPM_TOKEN=$(grep -oP '//registry.npmjs.org/:_authToken=\K.*' "$NPMRC_FILE" 2>/dev/null || echo "")
+    if [ -n "$NPM_TOKEN" ]; then
+        SECRETS=$(echo "$SECRETS" | jq --arg token "$NPM_TOKEN" '.npm = { auth_token: $token }')
+        echo "[save-secrets] npm credentials: captured"
+    else
+        echo "[save-secrets] npm credentials: no auth token found in .npmrc"
+    fi
+else
+    echo "[save-secrets] npm credentials: not found (run 'npm login' to authenticate)"
+fi
+
 # Capture infrastructure secrets from infra/.env (includes Langfuse project keys)
 INFRA_ENV="/workspace/infra/.env"
 if [ -f "$INFRA_ENV" ]; then

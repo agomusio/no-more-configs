@@ -8,6 +8,31 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
+## [1.1.0] - 2026-02-16 `released`
+
+### Added
+
+- **`npx no-more-configs@latest`** — zero-dependency ESM CLI for installing and updating NMC from the host. Handles fresh clone with VS Code auto-open, dirty-tree warnings, `.devcontainer/` tree-hash comparison, and rebuild detection. Published to npm as [`no-more-configs`](https://www.npmjs.com/package/no-more-configs)
+- **`nmc-update`** — in-container update command (`/usr/local/bin/nmc-update`). Fetches, pulls, compares devcontainer tree hash, advises rebuild when needed
+- **OMZ update notification plugin** — background version check every 24 hours, colored banner on shell open when a new version is available
+- npm credential persistence — `save-secrets` captures `~/.npmrc` auth token, restored on rebuild
+- Firewall disable option — set `firewall.enabled: false` in `config.json` to flush all iptables rules
+- Azure Blob Storage (`*.blob.core.windows.net`) added to core firewall domains (VS Code extension downloads)
+
+### Changed
+
+- Devcontainer renamed from "Claude Code Sandbox" to "No More Configs"
+- README: `npx no-more-configs@latest` as primary install method with npm badge
+- README: §5 Updating now documents both host-side (`npx no-more-configs@latest`) and in-container (`nmc-update`) update paths
+- README: `secrets.json` documentation expanded with full key reference table (all credential sources and their origins)
+- Core firewall domain count updated from 31 to 32
+
+### Fixed
+
+- Architecture diagram not centered in README
+
+---
+
 ## [1.0.3] - 2026-02-16 `released`
 
 ### Fixed
@@ -105,7 +130,8 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.0.3]: https://github.com/agomusio/no-more-configs/compare/v1.0.2...HEAD
+[1.1.0]: https://github.com/agomusio/no-more-configs/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/agomusio/no-more-configs/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/agomusio/no-more-configs/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/agomusio/no-more-configs/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/agomusio/no-more-configs/releases/tag/v1.0.0

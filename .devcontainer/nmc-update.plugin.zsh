@@ -36,9 +36,9 @@ _nmc_update_banner() {
 
     print -P ""
     if [[ -n "$current_version" ]]; then
-        print -P "%F{yellow}%B[nmc]%b Update available: v${current_version} → %Bv${new_version}%b. Run %Bnmc-update%b to update.%f"
+        print -P "%F{cyan}%B[nmc]%b%f Update available: %F{yellow}v${current_version}%f → %F{green}%Bv${new_version}%b%f. Run %F{cyan}%Bnmc-update%b%f to update."
     else
-        print -P "%F{yellow}%B[nmc]%b Update available: %Bv${new_version}%b. Run %Bnmc-update%b to update.%f"
+        print -P "%F{cyan}%B[nmc]%b%f Update available: %F{green}%Bv${new_version}%b%f. Run %F{cyan}%Bnmc-update%b%f to update."
     fi
     print -P ""
 }

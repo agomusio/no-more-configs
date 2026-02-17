@@ -742,6 +742,18 @@ GHEOF
     fi
 fi
 
+# Restore npm credentials from secrets.json
+if [ -f "$SECRETS_FILE" ]; then
+    NPM_TOKEN=$(jq -r '.npm.auth_token // ""' "$SECRETS_FILE" 2>/dev/null || echo "")
+    if [ -n "$NPM_TOKEN" ]; then
+        echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > /home/node/.npmrc
+        chmod 600 /home/node/.npmrc
+        echo "[install] npm credentials restored"
+    else
+        echo "[install] npm credentials not found — run 'npm login' to authenticate"
+    fi
+fi
+
 # Restore git identity from secrets.json
 if [ -f "$SECRETS_FILE" ]; then
     GIT_NAME=$(jq -r '.git.name // ""' "$SECRETS_FILE" 2>/dev/null || echo "")
