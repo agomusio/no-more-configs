@@ -8,6 +8,30 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
+## [1.2.0] - 2026-02-20
+
+### Added
+
+- **Codex command mirroring** — all commands (standalone, plugin, and project plugin) are now mirrored to `~/.codex/prompts/` with Claude-specific frontmatter (`allowed-tools`, `hide-from-slash-command-tool`) automatically stripped
+- **Project `.claude/` → Codex cloning** — each project's `.claude/skills/` and `.claude/commands/` are cloned into Codex's global `~/.codex/skills/` and `~/.codex/prompts/` on rebuild, independent of project plugin scanning
+- **Codex session persistence** — new `codex-conversations` Docker volume mounts `~/.codex/sessions/` so Codex conversation history survives container rebuilds
+- **`codex.skip_dirs`** — new `config.json` field to exclude specific project directories from Codex cloning (e.g. `"skip_dirs": ["my-claude-only-project"]`)
+- `.codex/` automatically gitignored in project repos as a placeholder for future per-project Codex support
+- **Claude memory persistence** — `save-config` now saves `~/.claude/projects/*/memory/` files to `agent-config/memory/`, restored automatically on rebuild
+- **Selective home installs** — new `config.json` fields `agent.home_installs.skills` and `agent.home_installs.commands` to install only selected skills/commands (default: all)
+- **`project_plugin_scan`** — new `config.json` field to enable/disable project-repo plugin scanning (default: disabled)
+
+### Changed
+
+- Codex CLI now installed with `@latest` tag in Dockerfile to ensure newest version on each build
+- `save-config` now generates `codex.skip_dirs` field (defaults to empty array)
+
+### Fixed
+
+- `save-config` now preserves `firewall.enabled: false` instead of resetting it to `true` on every run
+
+---
+
 ## [1.1.2] - 2026-02-17
 
 ### Added
@@ -153,7 +177,8 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.1.2]: https://github.com/agomusio/no-more-configs/compare/v1.1.1...HEAD
+[1.2.0]: https://github.com/agomusio/no-more-configs/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/agomusio/no-more-configs/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/agomusio/no-more-configs/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/agomusio/no-more-configs/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/agomusio/no-more-configs/compare/v1.0.2...v1.0.3

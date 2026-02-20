@@ -78,13 +78,13 @@ CONFIG=$(echo "$CONFIG" | jq --argjson prefs "$CC_RESULT" '.claude_code = $prefs
 
 CONFIG=$(echo "$CONFIG" | jq '
     .firewall //= {} |
-    .firewall.enabled //= true |
+    .firewall |= (if has("enabled") then . else .enabled = true end) |
     .firewall.extra_domains //= []
 ')
 
 # ─── Section 3: codex ────────────────────────────────────────────────────────
 
-CONFIG=$(echo "$CONFIG" | jq '.codex //= {} | .codex.model //= "gpt-5.3-codex"')
+CONFIG=$(echo "$CONFIG" | jq '.codex //= {} | .codex.model //= "gpt-5.3-codex" | .codex.skip_dirs //= []')
 
 # ─── Section 4: infra ────────────────────────────────────────────────────────
 
@@ -116,6 +116,35 @@ for plugin_dir in /workspace/agent-config/plugins/*/; do
     CONFIG=$(echo "$CONFIG" | jq --arg p "$plugin_name" '.plugins[$p] //= {"enabled": true}')
 done
 
+# ─── Section 9: Claude memory ────────────────────────────────────────────────
+
+# Save Claude's per-project memory files so they survive container rebuilds.
+# Memory dirs live at ~/.claude/projects/<project-dir>/memory/
+MEMORY_DIR="/workspace/agent-config/memory"
+CLAUDE_PROJECTS="${CLAUDE_DIR:-$HOME/.claude}/projects"
+MEMORY_SAVED=0
+
+if [ -d "$CLAUDE_PROJECTS" ]; then
+    for mem_dir in "$CLAUDE_PROJECTS"/*/memory; do
+        [ -d "$mem_dir" ] || continue
+        # Skip empty memory directories
+        mem_files=$(find "$mem_dir" -maxdepth 1 -type f 2>/dev/null | head -1)
+        [ -z "$mem_files" ] && continue
+
+        project_dir=$(basename "$(dirname "$mem_dir")")
+        dest="$MEMORY_DIR/$project_dir"
+        mkdir -p "$dest"
+        cp -a "$mem_dir"/. "$dest"/
+        file_count=$(find "$dest" -type f | wc -l)
+        echo "[save-config] Memory saved: $project_dir ($file_count file(s))"
+        MEMORY_SAVED=$((MEMORY_SAVED + file_count))
+    done
+fi
+
+if [ "$MEMORY_SAVED" -eq 0 ]; then
+    echo "[save-config] No Claude memory files found to save"
+fi
+
 # ─── Write ────────────────────────────────────────────────────────────────────
 
 echo "$CONFIG" | jq '.' > "$CONFIG_FILE"
@@ -141,6 +170,7 @@ for section in firewall codex infra langfuse vscode mcp_servers plugins; do
     echo "[save-config] $section: $value"
 done
 
+echo "[save-config] Memory: $MEMORY_SAVED file(s) saved to agent-config/memory/"
 echo "[save-config] Written to $CONFIG_FILE"
 echo ""
 echo "[save-config] Tip: also run save-secrets to persist credentials (Claude, Codex, infra keys, etc.)"

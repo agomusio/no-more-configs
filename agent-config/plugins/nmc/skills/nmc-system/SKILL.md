@@ -47,6 +47,7 @@ All container configuration is driven by two files at the repo root:
 On container creation, `install-agent-config.sh` reads both files and generates:
 - `~/.claude/settings.json` (hooks, env vars, permissions — merged from `agent-config/settings.json.template` + plugins + GSD)
 - `~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/commands/`, `~/.claude/agents/` (copied from `agent-config/` + plugins)
+- `~/.codex/skills/`, `~/.codex/prompts/` (skills and commands mirrored for Codex, frontmatter stripped)
 - `.devcontainer/firewall-domains.conf` (core domains + `config.json` extras)
 - `.vscode/settings.json` (git scan paths from `config.json` + auto-detected repos)
 - `~/.claude/.mcp.json` (Claude MCP server config from enabled templates)
@@ -102,8 +103,9 @@ On container creation, the install script:
 1. Discovers plugins in `agent-config/plugins/*/`
 2. Checks `config.json` `.plugins.{name}.enabled` (default: true)
 3. Validates `plugin.json` exists and name matches directory
-4. Copies skills → `~/.claude/skills/`, commands → `~/.claude/commands/`, agents → `~/.claude/agents/`, hooks → `~/.claude/hooks/`
-5. Accumulates hook registrations and env vars from all plugins
+4. Copies skills → `~/.claude/skills/` + `~/.codex/skills/`, commands → `~/.claude/commands/` + `~/.codex/prompts/`, agents → `~/.claude/agents/`, hooks → `~/.claude/hooks/`
+5. Clones project `.claude/` content (skills + commands) into `~/.codex/` for Codex (skips projects in `codex.skip_dirs`)
+6. Accumulates hook registrations and env vars from all plugins
 6. After GSD install + enforcement, merges template hooks + env into `~/.claude/settings.json`
 7. Merges plugin hooks into `~/.claude/settings.json` `.hooks` (appended, not overwritten)
 8. Merges plugin env vars into `~/.claude/settings.json` `.env`
@@ -176,9 +178,12 @@ On container creation, the install script:
 | `/workspace/secrets.json` | Credentials (Claude auth, Codex auth, infra secrets) — gitignored |
 | `/workspace/agent-config/` | Version-controlled templates, skills, hooks, plugins |
 | `/home/node/.claude/` | Container-local Claude config (generated at build time) |
-| `/home/node/.codex/` | Codex CLI config and credentials |
+| `/home/node/.codex/` | Codex CLI config, credentials, skills, and prompts |
 | `/home/node/.codex/config.toml` | Codex config (model, MCP servers, approval policy) |
 | `/home/node/.codex/auth.json` | Codex OAuth credentials (restored from secrets.json) |
+| `/home/node/.codex/skills/` | Skills mirrored from Claude (global + project) |
+| `/home/node/.codex/prompts/` | Commands mirrored from Claude (frontmatter stripped) |
+| `/home/node/.codex/sessions/` | Conversation history (Docker volume, persists across rebuilds) |
 | `/home/node/.claude/commands/gsd/` | GSD slash commands (30+) |
 | `/home/node/.claude/agents/gsd-*.md` | GSD specialized agents (11 agents) |
 | `/home/node/.claude/hooks/langfuse_hook.py` | Langfuse tracing hook |
@@ -284,7 +289,8 @@ To permanently add: edit `config.json → firewall.extra_domains` and rebuild.
 |--------|--------|------|---------|
 | Host Docker socket | `/var/run/docker.sock` | Bind | Docker-outside-of-Docker |
 | `claude-code-bashhistory` | `/commandhistory` | Volume | Shell history persists across rebuilds |
-| `claude-code-conversations` | `/home/node/.claude/projects` | Volume | Conversation data persists across rebuilds |
+| `claude-code-conversations` | `/home/node/.claude/projects` | Volume | Claude conversation data persists across rebuilds |
+| `codex-conversations` | `/home/node/.codex/sessions` | Volume | Codex conversation data persists across rebuilds |
 | Workspace | `/workspace` | Bind | Delegated consistency |
 
 Note: No `~/.claude` bind mount. All Claude config is generated container-locally by `install-agent-config.sh`.

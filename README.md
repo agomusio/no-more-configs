@@ -193,7 +193,7 @@ Everything is driven by two files at the repo root:
 ```json
 {
   "firewall": { "extra_domains": ["your-api.example.com"] },
-  "codex": { "model": "gpt-5.3-codex" },
+  "codex": { "model": "gpt-5.3-codex", "skip_dirs": [] },
   "langfuse": { "host": "http://host.docker.internal:3052" },
   "vscode": { "git_scan_paths": ["projects/my-project"] },
   "mcp_servers": {
@@ -270,7 +270,7 @@ Plugins are self-registering bundles discovered from `agent-config/plugins/*/plu
 - **hooks** — registered in settings.json (multiple plugins accumulate on same events)
 - **env** — injected with `{{TOKEN}}` placeholder hydration from `secrets.json[plugin-name][TOKEN]`
 - **mcp_servers** — merged into `.mcp.json` with `_source` tagging for persistence
-- **files** — skills, hooks, commands, agents copied to `~/.claude/`
+- **files** — skills, hooks, commands, agents copied to `~/.claude/` (skills and commands also mirrored to `~/.codex/`)
 
 ### Creating a Plugin
 
@@ -350,10 +350,10 @@ The `agent-config/` directory is the version-controlled source of truth:
 - **`settings.json.template`** — Permissions-only template (hooks and env come from plugins)
 - **`plugins/`** — Self-registering plugin bundles with `plugin.json` manifests
 - **`skills/`** — Standalone skills copied to `~/.claude/skills/` and `~/.codex/skills/`
-- **`commands/`** — Standalone slash commands copied to `~/.claude/commands/`
+- **`commands/`** — Standalone slash commands copied to `~/.claude/commands/` and `~/.codex/prompts/`
 - **`mcp-templates/`** — MCP server templates (mcp-gateway, codex) with placeholder hydration
 
-Add your own skills by creating a directory under `agent-config/skills/` with a `SKILL.md` file. They'll be installed to both Claude and Codex automatically on rebuild.
+Add your own skills by creating a directory under `agent-config/skills/` with a `SKILL.md` file. They'll be installed to both Claude and Codex automatically on rebuild. Commands are also mirrored — `~/.claude/commands/` for Claude and `~/.codex/prompts/` for Codex (with Claude-specific frontmatter stripped).
 
 ---
 
@@ -546,6 +546,16 @@ Edit `config.json`:
 ```
 
 Rebuild the container. Default is `gpt-5.3-codex`.
+
+### Disabling Codex for Specific Projects
+
+Project `.claude/` content (skills and commands) is automatically mirrored to Codex's global directories on rebuild. To exclude specific projects:
+
+```json
+{ "codex": { "skip_dirs": ["my-claude-only-project"] } }
+```
+
+Values are project directory names under `projects/`. Excluded projects still get `.codex/` gitignored as a placeholder.
 
 ### Adding Skills
 

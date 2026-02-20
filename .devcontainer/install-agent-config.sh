@@ -30,6 +30,104 @@ validate_json() {
     return 0
 }
 
+# JSON array membership helper
+item_in_json_array() {
+    local item="$1"
+    local json_array="$2"
+    jq -e --arg item "$item" 'index($item) != null' <<< "$json_array" >/dev/null 2>&1
+}
+
+# Install filters: empty arrays mean "install all"
+should_install_skill() {
+    local skill_name="$1"
+    if [ "$SKILL_FILTER" = "[]" ]; then
+        return 0
+    fi
+    item_in_json_array "$skill_name" "$SKILL_FILTER"
+}
+
+should_install_command() {
+    local command_ref="$1"      # supports "name.md" or "namespace/name.md"
+    local command_base="${command_ref##*/}"
+    if [ "$COMMAND_FILTER" = "[]" ]; then
+        return 0
+    fi
+    item_in_json_array "$command_ref" "$COMMAND_FILTER" || item_in_json_array "$command_base" "$COMMAND_FILTER"
+}
+
+# Copy a skill directory to Codex and ensure SKILL.md starts with YAML frontmatter.
+copy_skill_dir_to_codex() {
+    local src_skill_dir="$1"
+    local skill_name
+    local dst_skill_dir
+    local dst_skill_file
+    local tmp_file
+    skill_name=$(basename "$src_skill_dir")
+    dst_skill_dir="/home/node/.codex/skills/$skill_name"
+    dst_skill_file="$dst_skill_dir/SKILL.md"
+
+    rm -rf "$dst_skill_dir"
+    mkdir -p "$dst_skill_dir"
+    cp -r "$src_skill_dir"/. "$dst_skill_dir"/ 2>/dev/null || true
+
+    if [ ! -f "$dst_skill_file" ]; then
+        return 0
+    fi
+
+    if [ "$(head -n1 "$dst_skill_file" 2>/dev/null || true)" = "---" ]; then
+        return 0
+    fi
+
+    tmp_file="$(mktemp)"
+    {
+        echo "---"
+        echo "name: $skill_name"
+        echo "description: Converted Claude skill for Codex compatibility."
+        echo "---"
+        echo ""
+        cat "$dst_skill_file"
+    } > "$tmp_file"
+    mv "$tmp_file" "$dst_skill_file"
+    echo "[install] Codex skill '$skill_name': added missing YAML frontmatter"
+}
+
+# Strip Claude-specific frontmatter keys from a command .md for Codex prompt format.
+# Removes allowed-tools (multi-line YAML list or inline JSON array) and hide-from-slash-command-tool.
+strip_allowed_tools_frontmatter() {
+    local src="$1" dst="$2"
+    if [ "$(head -n1 "$src" 2>/dev/null || true)" != "---" ]; then
+        cp "$src" "$dst"; return 0
+    fi
+    awk '
+        BEGIN { in_fm=0; skip_list=0 }
+        NR==1 && /^---$/ { in_fm=1; print; next }
+        in_fm && /^---$/ { in_fm=0; skip_list=0; print; next }
+        in_fm && /^allowed-tools:/ { if (/\[/) next; skip_list=1; next }
+        in_fm && skip_list && /^[[:space:]]+-/ { next }
+        in_fm && skip_list { skip_list=0 }
+        in_fm && /^hide-from-slash-command-tool:/ { next }
+        { print }
+    ' "$src" > "$dst"
+}
+
+# Append .codex/ to a project's .gitignore if not already present.
+ensure_codex_gitignore() {
+    local project_path="$1"
+    # Only act on git repos
+    [ -d "$project_path/.git" ] || return 0
+    local gitignore="$project_path/.gitignore"
+    if [ -f "$gitignore" ]; then
+        # Handle both LF and CRLF line endings in grep match
+        if ! grep -qP '^\.codex/\r?$' "$gitignore" 2>/dev/null; then
+            # Ensure file ends with newline before appending
+            [ -s "$gitignore" ] && [ "$(tail -c1 "$gitignore" | od -An -tx1 | tr -d ' ')" != "0a" ] && echo "" >> "$gitignore"
+            echo '.codex/' >> "$gitignore"
+        fi
+    else
+        echo '.codex/' > "$gitignore"
+    fi
+}
+
 # Initialize counters for summary
 CONFIG_STATUS="defaults — config.json not found"
 SECRETS_STATUS="empty placeholders — secrets.json not found"
@@ -41,6 +139,10 @@ MCP_COUNT=0
 GSD_COMMANDS=0
 GSD_AGENTS=0
 COMMANDS_COUNT=0
+SKILL_FILTER='[]'
+COMMAND_FILTER='[]'
+SKILL_FILTER_STATUS="all"
+COMMAND_FILTER_STATUS="all"
 PLUGIN_INSTALLED=0
 PLUGIN_SKIPPED=0
 PLUGIN_HOOKS='{}'
@@ -48,6 +150,8 @@ PLUGIN_ENV='{}'
 PLUGIN_MCP='{}'
 PLUGIN_WARNINGS=0
 declare -a PLUGIN_WARNING_MESSAGES=()
+CODEX_PROMPTS_COUNT=0
+CODEX_CLONE_COUNT=0
 
 # Load config.json (or use defaults)
 if [ -f "$CONFIG_FILE" ]; then
@@ -60,6 +164,41 @@ if [ -f "$CONFIG_FILE" ]; then
 else
     echo "[install] config.json not found — using defaults"
     EXTRA_DOMAINS=""
+fi
+
+# Optional install filters (config.json: agent.home_installs.skills / commands)
+# Empty array or missing key means "install all".
+if [ -f "$CONFIG_FILE" ] && validate_json "$CONFIG_FILE" "config.json"; then
+    SKILL_FILTER=$(jq -c '.agent.home_installs.skills // []' "$CONFIG_FILE" 2>/dev/null || echo "[]")
+    COMMAND_FILTER=$(jq -c '.agent.home_installs.commands // []' "$CONFIG_FILE" 2>/dev/null || echo "[]")
+
+    if ! jq -e 'type == "array"' <<< "$SKILL_FILTER" >/dev/null 2>&1; then
+        echo "[install] WARNING: agent.home_installs.skills must be an array — ignoring"
+        SKILL_FILTER='[]'
+    fi
+    if ! jq -e 'type == "array"' <<< "$COMMAND_FILTER" >/dev/null 2>&1; then
+        echo "[install] WARNING: agent.home_installs.commands must be an array — ignoring"
+        COMMAND_FILTER='[]'
+    fi
+
+    SKILL_FILTER_LEN=$(jq 'length' <<< "$SKILL_FILTER" 2>/dev/null || echo 0)
+    COMMAND_FILTER_LEN=$(jq 'length' <<< "$COMMAND_FILTER" 2>/dev/null || echo 0)
+    if [ "$SKILL_FILTER_LEN" -gt 0 ]; then
+        SKILL_FILTER_STATUS="$SKILL_FILTER_LEN selected"
+    fi
+    if [ "$COMMAND_FILTER_LEN" -gt 0 ]; then
+        COMMAND_FILTER_STATUS="$COMMAND_FILTER_LEN selected"
+    fi
+fi
+
+# Codex skip_dirs: project directory names where .codex cloning is disabled
+CODEX_SKIP_DIRS='[]'
+if [ -f "$CONFIG_FILE" ] && validate_json "$CONFIG_FILE" "config.json"; then
+    CODEX_SKIP_DIRS=$(jq -c '.codex.skip_dirs // []' "$CONFIG_FILE" 2>/dev/null || echo "[]")
+    if ! jq -e 'type == "array"' <<< "$CODEX_SKIP_DIRS" >/dev/null 2>&1; then
+        echo "[install] WARNING: codex.skip_dirs must be an array — ignoring"
+        CODEX_SKIP_DIRS='[]'
+    fi
 fi
 
 # Load secrets.json (or use empty placeholders)
@@ -194,6 +333,7 @@ mkdir -p "$CLAUDE_DIR/hooks"
 mkdir -p "$CLAUDE_DIR/agents"
 mkdir -p "$CLAUDE_DIR/commands"
 mkdir -p /home/node/.codex
+mkdir -p /home/node/.codex/prompts
 
 # Resolve Codex model (config.toml generated after plugin loop to include MCP servers)
 CODEX_MODEL="gpt-5.3-codex"
@@ -210,11 +350,18 @@ if [ -d "$AGENT_CONFIG_DIR/skills" ]; then
     # Create Codex skills directory
     mkdir -p /home/node/.codex/skills
 
-    # Copy to both Claude and Codex
-    cp -r "$AGENT_CONFIG_DIR/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
-    cp -r "$AGENT_CONFIG_DIR/skills/"* /home/node/.codex/skills/ 2>/dev/null || true
+    # Copy selected skill directories to both Claude and Codex
+    for skill_dir in "$AGENT_CONFIG_DIR/skills"/*/; do
+        [ -d "$skill_dir" ] || continue
+        skill_name=$(basename "$skill_dir")
+        if ! should_install_skill "$skill_name"; then
+            continue
+        fi
+        cp -r "$skill_dir" "$CLAUDE_DIR/skills/"
+        copy_skill_dir_to_codex "$skill_dir"
+        SKILLS_COUNT=$((SKILLS_COUNT + 1))
+    done
 
-    SKILLS_COUNT=$(find "$AGENT_CONFIG_DIR/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
     echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 fi
 
@@ -225,6 +372,9 @@ if [ -d "$AGENT_CONFIG_DIR/hooks" ]; then
     HOOKS_COUNT=$(find "$AGENT_CONFIG_DIR/hooks" -maxdepth 1 -type f 2>/dev/null | wc -l)
     echo "[install] Copied $HOOKS_COUNT hook(s) to $CLAUDE_DIR/hooks/"
 fi
+
+# Clean and recreate Codex prompts directory (idempotent across re-runs)
+rm -rf /home/node/.codex/prompts && mkdir -p /home/node/.codex/prompts
 
 # Copy standalone commands from agent-config to runtime location
 COMMANDS_COUNT=0
@@ -242,8 +392,14 @@ if [ -d "$AGENT_CONFIG_DIR/commands" ]; then
             continue
         fi
 
+        if ! should_install_command "$cmd_name"; then
+            continue
+        fi
+
         # Copy to commands directory
         cp "$cmd_file" "$CLAUDE_DIR/commands/"
+        strip_allowed_tools_frontmatter "$cmd_file" "/home/node/.codex/prompts/$cmd_name"
+        CODEX_PROMPTS_COUNT=$((CODEX_PROMPTS_COUNT + 1))
         COMMANDS_COUNT=$((COMMANDS_COUNT + 1))
     done
     if [ $COMMANDS_COUNT -gt 0 ]; then
@@ -392,9 +548,16 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
 
         # Copy skills (cross-agent: Claude + Codex)
         if [ -d "$plugin_dir/skills" ]; then
-            cp -r "$plugin_dir/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
-            cp -r "$plugin_dir/skills/"* /home/node/.codex/skills/ 2>/dev/null || true
-            plugin_skills=$(find "$plugin_dir/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
+            for skill_dir in "$plugin_dir/skills"/*/; do
+                [ -d "$skill_dir" ] || continue
+                skill_name=$(basename "$skill_dir")
+                if ! should_install_skill "$skill_name"; then
+                    continue
+                fi
+                cp -r "$skill_dir" "$CLAUDE_DIR/skills/"
+                copy_skill_dir_to_codex "$skill_dir"
+                plugin_skills=$((plugin_skills + 1))
+            done
         fi
 
         # Copy hooks (with overwrite detection)
@@ -426,6 +589,9 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
             for cmd_file in "$plugin_dir/commands"/*.md; do
                 [ -f "$cmd_file" ] || continue
                 cmd_basename=$(basename "$cmd_file")
+                if ! should_install_command "$cmd_basename"; then
+                    continue
+                fi
                 if [ -n "${PLUGIN_FILE_OWNERS[commands/$cmd_basename]+x}" ]; then
                     echo "[install] WARNING: Plugin '$plugin_name' command '$cmd_basename' conflicts with plugin '${PLUGIN_FILE_OWNERS[commands/$cmd_basename]}' — skipping file"
                     PLUGIN_WARNINGS=$((PLUGIN_WARNINGS + 1))
@@ -433,6 +599,10 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
                 else
                     PLUGIN_FILE_OWNERS["commands/$cmd_basename"]="$plugin_name"
                     cp "$cmd_file" "$CLAUDE_DIR/commands/"
+                    mkdir -p /home/node/.codex/prompts
+                    strip_allowed_tools_frontmatter "$cmd_file" "/home/node/.codex/prompts/$cmd_basename"
+                    CODEX_PROMPTS_COUNT=$((CODEX_PROMPTS_COUNT + 1))
+                    plugin_cmds=$((plugin_cmds + 1))
                 fi
             done
             # Copy namespaced command subdirectories (commands/<namespace>/*.md → <namespace>:cmd)
@@ -441,9 +611,20 @@ if [ -d "$AGENT_CONFIG_DIR/plugins" ]; then
                 subdir_name=$(basename "$cmd_subdir")
                 [ "$subdir_name" = "gsd" ] && continue  # GSD-protected
                 mkdir -p "$CLAUDE_DIR/commands/$subdir_name"
-                cp "$cmd_subdir"*.md "$CLAUDE_DIR/commands/$subdir_name/" 2>/dev/null || true
+                for cmd_file in "$cmd_subdir"*.md; do
+                    [ -f "$cmd_file" ] || continue
+                    cmd_basename=$(basename "$cmd_file")
+                    cmd_ref="$subdir_name/$cmd_basename"
+                    if ! should_install_command "$cmd_ref"; then
+                        continue
+                    fi
+                    cp "$cmd_file" "$CLAUDE_DIR/commands/$subdir_name/"
+                    mkdir -p "/home/node/.codex/prompts/$subdir_name"
+                    strip_allowed_tools_frontmatter "$cmd_file" "/home/node/.codex/prompts/$subdir_name/$cmd_basename"
+                    CODEX_PROMPTS_COUNT=$((CODEX_PROMPTS_COUNT + 1))
+                    plugin_cmds=$((plugin_cmds + 1))
+                done
             done
-            plugin_cmds=$(find "$plugin_dir/commands" -name "*.md" -type f 2>/dev/null | wc -l)
         fi
 
         # Copy agents (with GSD protection and overwrite detection)
@@ -768,6 +949,26 @@ if [ -f "$SECRETS_FILE" ]; then
     fi
 fi
 
+# Restore Claude memory files from agent-config/memory/
+MEMORY_DIR="$AGENT_CONFIG_DIR/memory"
+MEMORY_STATUS="none saved"
+if [ -d "$MEMORY_DIR" ]; then
+    MEMORY_RESTORED=0
+    for project_mem in "$MEMORY_DIR"/*/; do
+        [ -d "$project_mem" ] || continue
+        project_dir=$(basename "$project_mem")
+        dest="$CLAUDE_DIR/projects/$project_dir/memory"
+        mkdir -p "$dest"
+        cp -a "$project_mem"/. "$dest"/
+        file_count=$(find "$dest" -type f | wc -l)
+        echo "[install] Memory restored: $project_dir ($file_count file(s))"
+        MEMORY_RESTORED=$((MEMORY_RESTORED + file_count))
+    done
+    if [ "$MEMORY_RESTORED" -gt 0 ]; then
+        MEMORY_STATUS="$MEMORY_RESTORED file(s) restored"
+    fi
+fi
+
 # Hydrate {{TOKEN}} placeholders in plugin MCP configs from secrets.json
 hydrate_plugin_mcp() {
     local plugin_mcp="$1"
@@ -970,11 +1171,25 @@ fi
 # and copies their components to runtime locations (same as agent-config plugins).
 # The plugins[] array alone doesn't work from /workspace/ — Claude Code only
 # auto-discovers plugin components when cwd matches the project root.
+#
+# Read project_plugin_scan from config.json (default: false).
+# Can also override via env var NMC_SKIP_PROJECT_PLUGINS=1.
+if [ -z "${NMC_SKIP_PROJECT_PLUGINS:-}" ]; then
+    _scan_enabled=$(jq -r '.project_plugin_scan // false' "$CONFIG_FILE" 2>/dev/null)
+    if [ "$_scan_enabled" = "true" ]; then
+        NMC_SKIP_PROJECT_PLUGINS=0
+    else
+        NMC_SKIP_PROJECT_PLUGINS=1
+    fi
+fi
+
 PROJECT_PLUGINS_COUNT=0
 declare -a PROJECT_PLUGIN_DETAIL_LINES=()
 declare -a PROJECT_HOOKS_PENDING=()
 
-if [ -d "$WORKSPACE_ROOT/projects" ]; then
+if [ "$NMC_SKIP_PROJECT_PLUGINS" = "1" ]; then
+    echo "[install] Project plugin scanning disabled (NMC_SKIP_PROJECT_PLUGINS=1)"
+elif [ -d "$WORKSPACE_ROOT/projects" ]; then
     for project_dir in "$WORKSPACE_ROOT/projects"/*/; do
         [ -d "$project_dir" ] || continue
         PLUGINS_DIR="$project_dir.claude/plugins"
@@ -1008,9 +1223,16 @@ if [ -d "$WORKSPACE_ROOT/projects" ]; then
 
             # Copy skills (cross-agent: Claude + Codex)
             if [ -d "$plugin_dir/skills" ]; then
-                cp -r "$plugin_dir/skills/"* "$CLAUDE_DIR/skills/" 2>/dev/null || true
-                cp -r "$plugin_dir/skills/"* /home/node/.codex/skills/ 2>/dev/null || true
-                pp_skills=$(find "$plugin_dir/skills" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
+                for skill_dir in "$plugin_dir/skills"/*/; do
+                    [ -d "$skill_dir" ] || continue
+                    skill_name=$(basename "$skill_dir")
+                    if ! should_install_skill "$skill_name"; then
+                        continue
+                    fi
+                    cp -r "$skill_dir" "$CLAUDE_DIR/skills/"
+                    copy_skill_dir_to_codex "$skill_dir"
+                    pp_skills=$((pp_skills + 1))
+                done
             fi
 
             # Copy commands into namespaced subdirectory (commands/<plugin-name>/ → /plugin-name:cmd)
@@ -1022,9 +1244,16 @@ if [ -d "$WORKSPACE_ROOT/projects" ]; then
                 for cmd_file in "$plugin_dir/commands"/*.md; do
                     [ -f "$cmd_file" ] || continue
                     cmd_basename=$(basename "$cmd_file")
+                    cmd_ref="$cmd_namespace/$cmd_basename"
+                    if ! should_install_command "$cmd_ref"; then
+                        continue
+                    fi
                     cp "$cmd_file" "$CLAUDE_DIR/commands/$cmd_namespace/"
+                    mkdir -p "/home/node/.codex/prompts/$cmd_namespace"
+                    strip_allowed_tools_frontmatter "$cmd_file" "/home/node/.codex/prompts/$cmd_namespace/$cmd_basename"
+                    CODEX_PROMPTS_COUNT=$((CODEX_PROMPTS_COUNT + 1))
+                    pp_cmds=$((pp_cmds + 1))
                 done
-                pp_cmds=$(find "$plugin_dir/commands" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
             fi
 
             # Copy agents (with conflict detection)
@@ -1109,6 +1338,75 @@ if [ ${#PROJECT_HOOKS_PENDING[@]} -gt 0 ]; then
     echo "[install] Merged project plugin hooks into settings.json"
 fi
 
+# --- Clone repo .claude/ content to ~/.codex/ for Codex compatibility ---
+# Codex doesn't support per-project .codex/ dirs yet, so skills and prompts
+# are hydrated into the global ~/.codex/ location. Local .codex/ dirs are
+# gitignored as placeholders for future support.
+# Runs independently of NMC_SKIP_PROJECT_PLUGINS — direct .claude/ content always cloned.
+if [ -d "$WORKSPACE_ROOT/projects" ]; then
+    for project_dir in "$WORKSPACE_ROOT/projects"/*/; do
+        [ -d "$project_dir" ] || continue
+        CLAUDE_PROJECT_DIR="$project_dir.claude"
+        [ -d "$CLAUDE_PROJECT_DIR" ] || continue
+
+        project_basename=$(basename "$project_dir")
+
+        # Skip projects listed in codex.skip_dirs
+        if item_in_json_array "$project_basename" "$CODEX_SKIP_DIRS" 2>/dev/null; then
+            echo "[install] Codex clone '$project_basename': skipped (codex.skip_dirs)"
+            # Still gitignore .codex/ even for skipped projects
+            ensure_codex_gitignore "$project_dir"
+            continue
+        fi
+
+        clone_skills=0
+        clone_cmds=0
+
+        # Clone skills: .claude/skills/*/ → ~/.codex/skills/*/
+        if [ -d "$CLAUDE_PROJECT_DIR/skills" ]; then
+            mkdir -p /home/node/.codex/skills
+            for skill_dir in "$CLAUDE_PROJECT_DIR/skills"/*/; do
+                [ -d "$skill_dir" ] || continue
+                copy_skill_dir_to_codex "$skill_dir"
+                clone_skills=$((clone_skills + 1))
+            done
+        fi
+
+        # Clone commands: .claude/commands/*.md → ~/.codex/prompts/*.md
+        if [ -d "$CLAUDE_PROJECT_DIR/commands" ]; then
+            mkdir -p /home/node/.codex/prompts
+            for cmd_file in "$CLAUDE_PROJECT_DIR/commands"/*.md; do
+                [ -f "$cmd_file" ] || continue
+                cmd_basename=$(basename "$cmd_file")
+                strip_allowed_tools_frontmatter "$cmd_file" "/home/node/.codex/prompts/$cmd_basename"
+                clone_cmds=$((clone_cmds + 1))
+            done
+            # Clone namespaced command subdirectories
+            for cmd_subdir in "$CLAUDE_PROJECT_DIR/commands"/*/; do
+                [ -d "$cmd_subdir" ] || continue
+                subdir_name=$(basename "$cmd_subdir")
+                mkdir -p "/home/node/.codex/prompts/$subdir_name"
+                for cmd_file in "$cmd_subdir"*.md; do
+                    [ -f "$cmd_file" ] || continue
+                    cmd_basename=$(basename "$cmd_file")
+                    strip_allowed_tools_frontmatter "$cmd_file" "/home/node/.codex/prompts/$subdir_name/$cmd_basename"
+                    clone_cmds=$((clone_cmds + 1))
+                done
+            done
+        fi
+
+        # Skip: agents, hooks.json, settings.json, COMMAND_INDEX.md (no Codex equivalents)
+
+        # Ensure .codex/ is gitignored (placeholder for future per-project support)
+        ensure_codex_gitignore "$project_dir"
+
+        if [ "$clone_skills" -gt 0 ] || [ "$clone_cmds" -gt 0 ]; then
+            echo "[install] Codex clone '$project_basename': $clone_skills skill(s), $clone_cmds command(s)"
+            CODEX_CLONE_COUNT=$((CODEX_CLONE_COUNT + 1))
+        fi
+    done
+fi
+
 # Print summary
 echo "[install] --- Summary ---"
 echo "[install] Config: $CONFIG_STATUS"
@@ -1118,9 +1416,14 @@ echo "[install] Credentials (Claude): $CREDS_STATUS"
 echo "[install] Credentials (Codex): $CODEX_CREDS_STATUS"
 echo "[install] Git identity: $GIT_IDENTITY_STATUS"
 echo "[install] Preferences: $CC_PREFS_STATUS"
+echo "[install] Memory: $MEMORY_STATUS"
+echo "[install] Skill filter: $SKILL_FILTER_STATUS"
+echo "[install] Command filter: $COMMAND_FILTER_STATUS"
 echo "[install] Skills: $SKILLS_COUNT skill(s) -> Claude + Codex"
 echo "[install] Hooks: $HOOKS_COUNT hook(s)"
 echo "[install] Commands: $COMMANDS_COUNT standalone command(s)"
+echo "[install] Codex prompts: $CODEX_PROMPTS_COUNT prompt(s) -> ~/.codex/prompts/"
+echo "[install] Codex clone: $CODEX_CLONE_COUNT project(s)"
 echo "[install] Upstream plugins: $UPSTREAM_STATUS"
 echo "[install] Plugins (agent-config): $PLUGIN_INSTALLED installed, $PLUGIN_SKIPPED skipped"
 if [ ${#PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
@@ -1128,7 +1431,11 @@ if [ ${#PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
         echo "[install] $detail_line"
     done
 fi
-echo "[install] Plugins (projects): $PROJECT_PLUGINS_COUNT installed"
+if [ "$NMC_SKIP_PROJECT_PLUGINS" = "1" ]; then
+    echo "[install] Plugins (projects): disabled"
+else
+    echo "[install] Plugins (projects): $PROJECT_PLUGINS_COUNT installed"
+fi
 if [ ${#PROJECT_PLUGIN_DETAIL_LINES[@]} -gt 0 ]; then
     for detail_line in "${PROJECT_PLUGIN_DETAIL_LINES[@]}"; do
         echo "[install] $detail_line"
