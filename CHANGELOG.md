@@ -25,6 +25,7 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 - Codex CLI now installed with `@latest` tag in Dockerfile to ensure newest version on each build
 - `save-config` now generates `codex.skip_dirs` field (defaults to empty array)
+- MCP gateway now defaults to disabled in `save-config` (`mcp-gateway.enabled: false`) — enable manually in `config.json` when needed
 
 ### Fixed
 

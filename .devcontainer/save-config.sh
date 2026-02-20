@@ -102,7 +102,7 @@ CONFIG=$(echo "$CONFIG" | jq '.vscode //= {} | .vscode.git_scan_paths //= []')
 
 CONFIG=$(echo "$CONFIG" | jq '
     .mcp_servers //= {} |
-    .mcp_servers["mcp-gateway"] //= {"enabled": true}
+    .mcp_servers["mcp-gateway"] //= {"enabled": false}
 ')
 
 # ─── Section 8: plugins ──────────────────────────────────────────────────────

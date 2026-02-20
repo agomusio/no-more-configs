@@ -179,8 +179,7 @@ npx no-more-configs@latest
 nmc-update
 ```
 
-Both pull the latest changes and tell you if a container rebuild is needed. The container shell also shows a notification banner when a new version is available.
----
+## Both pull the latest changes and tell you if a container rebuild is needed. The container shell also shows a notification banner when a new version is available.
 
 ## How It Works
 
@@ -197,7 +196,7 @@ Everything is driven by two files at the repo root:
   "langfuse": { "host": "http://host.docker.internal:3052" },
   "vscode": { "git_scan_paths": ["projects/my-project"] },
   "mcp_servers": {
-    "mcp-gateway": { "enabled": true },
+    "mcp-gateway": { "enabled": false },
     "codex": { "enabled": false, "targets": ["claude"] }
   },
   "plugins": { "nmc-langfuse-tracing": { "enabled": true, "env": {} } }
@@ -225,15 +224,15 @@ Everything is driven by two files at the repo root:
 }
 ```
 
-| Key | Source | Captured by |
-| --- | --- | --- |
-| `git` | `git config --global` | `save-secrets` |
-| `claude` | `~/.claude/.credentials.json` | `save-secrets` |
-| `codex` | `~/.codex/auth.json` | `save-secrets` |
-| `gh` | `~/.config/gh/hosts.yml` | `save-secrets` |
-| `npm` | `~/.npmrc` | `save-secrets` |
-| `infra` | `infra/.env` (Langfuse stack) | `langfuse-setup` → `save-secrets` |
-| `nmc-langfuse-tracing` | Derived from `infra` + `config.json` | `save-secrets` |
+| Key                    | Source                               | Captured by                       |
+| ---------------------- | ------------------------------------ | --------------------------------- |
+| `git`                  | `git config --global`                | `save-secrets`                    |
+| `claude`               | `~/.claude/.credentials.json`        | `save-secrets`                    |
+| `codex`                | `~/.codex/auth.json`                 | `save-secrets`                    |
+| `gh`                   | `~/.config/gh/hosts.yml`             | `save-secrets`                    |
+| `npm`                  | `~/.npmrc`                           | `save-secrets`                    |
+| `infra`                | `infra/.env` (Langfuse stack)        | `langfuse-setup` → `save-secrets` |
+| `nmc-langfuse-tracing` | Derived from `infra` + `config.json` | `save-secrets`                    |
 
 Plugin secrets use namespaced keys (`secrets.json["plugin-name"]["TOKEN"]`). The `infra` section holds Langfuse stack infrastructure secrets. Run `langfuse-setup` to generate these automatically — `save-secrets` derives the plugin namespace from the infra keys.
 
@@ -430,7 +429,7 @@ Enable a template server:
 ```json
 {
   "mcp_servers": {
-    "mcp-gateway": { "enabled": true },
+    "mcp-gateway": { "enabled": false },
     "codex": { "enabled": true, "targets": ["claude"] }
   }
 }
@@ -572,6 +571,7 @@ cd /workspace/projects && git clone <url>
 ```
 
 Add the path to `config.json → vscode.git_scan_paths` for VS Code git integration.
+
 ### Adding MCP Servers
 
 Via templates:
