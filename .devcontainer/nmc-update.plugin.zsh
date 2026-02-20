@@ -40,7 +40,8 @@ _nmc_update_banner() {
     else
         print -P "%F{cyan}%B[nmc]%b%f Update available: %F{green}%Bv${new_version}%b%f. Run %F{cyan}%Bnmc-update%b%f to update."
     fi
-    print -P ""
+    print ""
+    print ""
 }
 
 # ---------------------------------------------------------------------------
