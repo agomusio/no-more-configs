@@ -8,6 +8,27 @@ GitHub releases should use the title format: **vX.Y.Z — YYYY-MM-DD**
 
 ---
 
+## [1.2.1] - 2026-02-21
+
+### Added
+
+- **`config.json` auto-creation** — `initializeCommand` (PowerShell) creates `config.json` from `config.default.json` before the container builds, so new users always have a config file without manual steps
+- **`config.default.json`** — ships with the repo; contains all default values for every config section
+- **`CLAUDE.md`** — workspace-level context for Claude: project layout (`projects/`) and Next.js fast refresh fix (`--webpack` flag + webpack polling)
+
+### Changed
+
+- `nmc-langfuse-tracing` plugin now **disabled by default** — enable in `config.json → plugins` when ready to use Langfuse
+- `mcp-gateway` now **disabled by default** in both `config.default.json` and `save-config` fallback
+- README updated to reflect Windows-only support and corrected opt-in defaults
+
+### Fixed
+
+- Docker socket `chmod 666` now guarded with `-S` check — missing socket no longer aborts `postCreate`
+- `save-config` now uses atomic write (temp file + `mv`) to prevent config truncation on `jq` failure
+
+---
+
 ## [1.2.0] - 2026-02-20
 
 ### Added
@@ -178,7 +199,8 @@ First public release. Everything below is what ships out of the box.
 - `secrets.example.json` — secret schema reference
 - `LICENSE` — MIT
 
-[1.2.0]: https://github.com/agomusio/no-more-configs/compare/v1.1.2...HEAD
+[1.2.1]: https://github.com/agomusio/no-more-configs/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/agomusio/no-more-configs/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/agomusio/no-more-configs/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/agomusio/no-more-configs/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/agomusio/no-more-configs/compare/v1.0.3...v1.1.0
