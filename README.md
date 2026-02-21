@@ -17,7 +17,7 @@
 
 <pre>npx no-more-configs@latest</pre>
 
-**Tested on Windows (WSL2). macOS and Linux should work but are untested.**
+**Windows only (WSL2 + Docker Desktop required).**
 
 <br>
 
@@ -71,10 +71,10 @@ _"I spent weekends configuring Claude, Docker, and everything else — now you d
 
 ### Prerequisites
 
+- Windows with [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) enabled
 - [Node.js](https://nodejs.org/) >= 18 (for npx)
 - [VS Code](https://code.visualstudio.com/) with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
-- [Git](https://git-scm.com/)
+- [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) running (WSL2 backend)
 
 ### 1. Install and Open
 
@@ -199,7 +199,7 @@ Everything is driven by two files at the repo root:
     "mcp-gateway": { "enabled": false },
     "codex": { "enabled": false, "targets": ["claude"] }
   },
-  "plugins": { "nmc-langfuse-tracing": { "enabled": true, "env": {} } }
+  "plugins": { "nmc-langfuse-tracing": { "enabled": false } }
 }
 ```
 
@@ -308,7 +308,7 @@ Only declare fields you use — no empty arrays needed.
 
 ### Plugin Control
 
-Plugins are enabled by default. Disable via `config.json`:
+Most plugins are enabled by default. Some opt-in plugins (like `nmc-langfuse-tracing`) are disabled by default. Enable or disable any plugin via `config.json`:
 
 ```json
 { "plugins": { "my-plugin": { "enabled": false } } }
@@ -461,11 +461,15 @@ Run `/gsd:help` inside a Claude session for the full command list.
 
 ## Langfuse Tracing
 
-Every Claude conversation is automatically traced to your local Langfuse instance via the `nmc-langfuse-tracing` plugin. The plugin registers a Stop hook that reads transcript files, groups messages into turns, and sends structured traces with generation and tool spans.
+The `nmc-langfuse-tracing` plugin traces every Claude conversation to your local Langfuse instance. It registers a Stop hook that reads transcript files, groups messages into turns, and sends structured traces with generation and tool spans.
 
-View traces at `http://localhost:3052` after starting the Langfuse stack.
+Disabled by default. To enable, set in `config.json → plugins`:
 
-To disable tracing, set `"nmc-langfuse-tracing": { "enabled": false }` in `config.json → plugins`.
+```json
+{ "plugins": { "nmc-langfuse-tracing": { "enabled": true } } }
+```
+
+Then start the Langfuse stack and view traces at `http://localhost:3052`.
 
 ### Hook Logs
 

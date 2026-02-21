@@ -4,7 +4,11 @@ set -euo pipefail
 # SECURITY NOTE: 666 gives all container processes full Docker daemon access.
 # This is required for Docker-outside-of-Docker but grants significant host privileges.
 # Claude Code with --dangerously-skip-permissions can execute arbitrary docker commands.
-sudo chmod 666 /var/run/docker.sock
+if [ -S /var/run/docker.sock ]; then
+    sudo chmod 666 /var/run/docker.sock
+else
+    echo "[setup] /var/run/docker.sock not found — Docker-outside-of-Docker not available"
+fi
 
 # Fix ownership on Docker volume mounts.
 # Named volumes are created as root; the node user needs write access.

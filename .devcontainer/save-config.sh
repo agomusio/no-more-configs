@@ -107,13 +107,20 @@ CONFIG=$(echo "$CONFIG" | jq '
 
 # ─── Section 8: plugins ──────────────────────────────────────────────────────
 
-# Discover installed plugins and ensure each has an entry (default: enabled)
+# Discover installed plugins and ensure each has an entry.
+# Opt-in plugins (langfuse tracing) default to disabled; others default to enabled.
 CONFIG=$(echo "$CONFIG" | jq '.plugins //= {}')
+
+OPT_IN_PLUGINS=("nmc-langfuse-tracing")
 
 for plugin_dir in /workspace/agent-config/plugins/*/; do
     [ -d "$plugin_dir" ] || continue
     plugin_name=$(basename "$plugin_dir")
-    CONFIG=$(echo "$CONFIG" | jq --arg p "$plugin_name" '.plugins[$p] //= {"enabled": true}')
+    default_enabled="true"
+    for opt_in in "${OPT_IN_PLUGINS[@]}"; do
+        [ "$plugin_name" = "$opt_in" ] && default_enabled="false" && break
+    done
+    CONFIG=$(echo "$CONFIG" | jq --arg p "$plugin_name" --argjson d "$default_enabled" '.plugins[$p] //= {"enabled": $d}')
 done
 
 # ─── Section 9: Claude memory ────────────────────────────────────────────────
@@ -147,7 +154,7 @@ fi
 
 # ─── Write ────────────────────────────────────────────────────────────────────
 
-echo "$CONFIG" | jq '.' > "$CONFIG_FILE"
+echo "$CONFIG" | jq '.' > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 

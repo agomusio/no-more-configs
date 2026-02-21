@@ -1,0 +1,39 @@
+{
+  "claude_code": {
+    "autoCompactEnabled": true,
+    "autoInstallIdeExtension": true,
+    "autoConnectIde": false,
+    "respectGitignore": true,
+    "fileCheckpointingEnabled": true,
+    "terminalProgressBarEnabled": true,
+    "diffTool": "auto",
+    "editorMode": "normal",
+    "preferredNotifChannel": "auto"
+  },
+  "firewall": {
+    "enabled": true,
+    "extra_domains": []
+  },
+  "codex": {
+    "model": "gpt-5.3-codex"
+  },
+  "infra": {
+    "mcp_workspace_bind": "/workspace"
+  },
+  "langfuse": {
+    "host": "http://host.docker.internal:3052"
+  },
+  "vscode": {
+    "git_scan_paths": []
+  },
+  "mcp_servers": {
+    "mcp-gateway": {
+      "enabled": false
+    }
+  },
+  "plugins": {
+    "nmc-langfuse-tracing": {
+      "enabled": false
+    }
+  }
+}
